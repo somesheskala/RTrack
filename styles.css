@@ -659,6 +659,16 @@ textarea:focus {
   gap: 0.9rem;
 }
 
+.metrics-section-title {
+  margin: 0.1rem 0 -0.35rem;
+  padding: 0 0.3rem;
+  font-size: 0.84rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #4f4134;
+}
+
 .metrics-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));

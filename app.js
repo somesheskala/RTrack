@@ -507,6 +507,7 @@ function renderMetrics() {
 
   if (!isAuthenticated()) {
     metricsEl.innerHTML = `
+      <div class="metrics-section-title">Units</div>
       <div class="metrics-row">
         <div class="metric-box">Total Units<strong>${totalUnits}</strong><small>${escapeHtml(availableByBuilding || "-")}</small></div>
         <div class="metric-box">Occupied Units<strong>${occupiedUnits}</strong><small>${escapeHtml(occupiedByBuilding || "-")}</small></div>
@@ -533,37 +534,36 @@ function renderMetrics() {
   const totalSecurityDeposit = activeTenants.reduce((sum, tenant) => sum + Number(tenant.deposit || 0), 0);
   const byBuilding = getBuildingTotalsForMonth(monthKey, activeTenants);
   const depositByBuilding = getBuildingDepositTotals(activeTenants);
-  const buildingCards = byBuilding
+  const sortedBuildingTotals = byBuilding.slice().sort(([a], [b]) => a.localeCompare(b));
+  const expectedBreakdown = sortedBuildingTotals
+    .map(([building, totalsByBuilding]) => `${escapeHtml(building)} Rent Expected: ${money(totalsByBuilding.expected)}`)
+    .join("<br>");
+  const collectedBreakdown = sortedBuildingTotals
+    .map(([building, totalsByBuilding]) => `${escapeHtml(building)} Rent Collected: ${money(totalsByBuilding.collected)}`)
+    .join("<br>");
+  const outstandingBreakdown = sortedBuildingTotals
     .map(
-      ([building, totalsByBuilding]) => {
-        const depositTotal = depositByBuilding.get(building) || 0;
-        return `
-          <div class="metric-box">
-            ${escapeHtml(building)}<strong>${money(totalsByBuilding.expected)}</strong>
-            <small>Collected: ${money(totalsByBuilding.collected)} | Outstanding: ${money(
-              totalsByBuilding.expected - totalsByBuilding.collected
-            )}</small>
-            <small>Security Deposit: ${money(depositTotal)}</small>
-          </div>
-        `;
-      }
+      ([building, totalsByBuilding]) =>
+        `${escapeHtml(building)} Rent Outstanding: ${money(totalsByBuilding.expected - totalsByBuilding.collected)}`
     )
-    .join("");
+    .join("<br>");
+  const depositBreakdown = sortedBuildingTotals
+    .map(([building]) => `${escapeHtml(building)} Security Deposit: ${money(depositByBuilding.get(building) || 0)}`)
+    .join("<br>");
 
   metricsEl.innerHTML = `
+    <div class="metrics-section-title">Units</div>
     <div class="metrics-row">
       <div class="metric-box">Total Units<strong>${totalUnits}</strong><small>${escapeHtml(availableByBuilding || "-")}</small></div>
       <div class="metric-box">Occupied Units<strong>${occupiedUnits}</strong><small>${escapeHtml(occupiedByBuilding || "-")}</small></div>
       <div class="metric-box">Vacant Units<strong>${vacantUnits}</strong><small>${escapeHtml(vacantByBuilding || "-")}</small></div>
     </div>
+    <div class="metrics-section-title">Rent Summary (${formatMonth(monthKey)})</div>
     <div class="metrics-row">
-      <div class="metric-box">Expected (${formatMonth(monthKey)})<strong>${money(totals.expected)}</strong></div>
-      <div class="metric-box">Collected<strong>${money(totals.collected)}</strong></div>
-      <div class="metric-box">Outstanding<strong>${money(totals.expected - totals.collected)}</strong></div>
-      <div class="metric-box">Collected Security Deposit<strong>${money(totalSecurityDeposit)}</strong></div>
-    </div>
-    <div class="metrics-row">
-      ${buildingCards}
+      <div class="metric-box">Total Rent Expected<strong>${money(totals.expected)}</strong><small>${expectedBreakdown || "-"}</small></div>
+      <div class="metric-box">Total Rent Collected<strong>${money(totals.collected)}</strong><small>${collectedBreakdown || "-"}</small></div>
+      <div class="metric-box">Total Rent Outstanding<strong>${money(totals.expected - totals.collected)}</strong><small>${outstandingBreakdown || "-"}</small></div>
+      <div class="metric-box">Total Security Deposit<strong>${money(totalSecurityDeposit)}</strong><small>${depositBreakdown || "-"}</small></div>
     </div>
   `;
   metricsEl.dataset.appRendered = "1";
@@ -1076,10 +1076,21 @@ function renderUnits() {
 
   const occupiedCount = occupancy.occupied;
   const vacantCount = occupancy.vacant;
+  const sortedByBuilding = [...byBuilding.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const totalUnitsBreakdown = sortedByBuilding
+    .map(([building, totals]) => `${escapeHtml(building)} Total Units: ${totals.total}`)
+    .join("<br>");
+  const occupiedUnitsBreakdown = sortedByBuilding
+    .map(([building, totals]) => `${escapeHtml(building)} Occupied Units: ${totals.occupied}`)
+    .join("<br>");
+  const vacantUnitsBreakdown = sortedByBuilding
+    .map(([building, totals]) => `${escapeHtml(building)} Vacant Units: ${totals.vacant}`)
+    .join("<br>");
+
   const overallSummaryHtml = `
-    <div class="metric-box">Total Units<strong>${state.units.length}</strong></div>
-    <div class="metric-box">Occupied Units<strong>${occupiedCount}</strong></div>
-    <div class="metric-box">Vacant Units<strong>${vacantCount}</strong></div>
+    <div class="metric-box">Total Units<strong>${state.units.length}</strong><small>${totalUnitsBreakdown || "-"}</small></div>
+    <div class="metric-box">Occupied Units<strong>${occupiedCount}</strong><small>${occupiedUnitsBreakdown || "-"}</small></div>
+    <div class="metric-box">Vacant Units<strong>${vacantCount}</strong><small>${vacantUnitsBreakdown || "-"}</small></div>
   `;
   if (unitSummaryEl) {
     unitSummaryEl.innerHTML = overallSummaryHtml;
@@ -1088,27 +1099,13 @@ function renderUnits() {
     unitOverallSummaryEl.innerHTML = overallSummaryHtml;
   }
 
-  const buildingSummaryHtml = [...byBuilding.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([building, totals]) => {
-      const available = totals.vacant;
-      return `<div class="metric-box">${escapeHtml(building)}<strong>${available}</strong><small>Available: ${available} | Occupied: ${totals.occupied} | Total: ${totals.total}</small></div>`;
-    })
-    .join("");
-
-  let summaryTarget = unitBuildingSummaryEl;
-  if (!summaryTarget) {
-    const unitsPanel = document.querySelector('[data-tab-panel="available-units"] .table-head');
-    if (unitsPanel) {
-      summaryTarget = document.createElement("div");
-      summaryTarget.className = "unit-summary";
-      summaryTarget.id = "unitBuildingSummary";
-      unitsPanel.insertAdjacentElement("afterend", summaryTarget);
-    }
+  if (unitBuildingSummaryEl) {
+    unitBuildingSummaryEl.innerHTML = "";
+    unitBuildingSummaryEl.classList.add("hidden");
   }
-  if (summaryTarget) {
-    summaryTarget.innerHTML =
-      buildingSummaryHtml || '<div class="metric-box">No units added yet<strong>0</strong><small>Available: 0 | Occupied: 0 | Total: 0</small></div>';
+  const buildingSummaryHeading = document.querySelector('[data-tab-panel="available-units"] .subhead');
+  if (buildingSummaryHeading) {
+    buildingSummaryHeading.classList.add("hidden");
   }
 }
 
@@ -1521,7 +1518,7 @@ function startEditUnit(unitId) {
   syncUnitTenantField();
   unitFormTitleEl.textContent = "Unit Occupancy - Edit Unit";
   unitSubmitBtnEl.textContent = "Update Unit";
-  cancelUnitEditEl.classList.remove("hidden");
+  cancelUnitEditEl.textContent = "Cancel Edit";
 }
 
 function cancelUnitEdit() {
@@ -1536,7 +1533,7 @@ function resetUnitForm() {
   syncUnitTenantField();
   unitFormTitleEl.textContent = "Unit Occupancy - Add Unit";
   unitSubmitBtnEl.textContent = "Save Unit";
-  cancelUnitEditEl.classList.add("hidden");
+  cancelUnitEditEl.textContent = "Cancel";
 }
 
 function setUnitVacant(unitId) {
