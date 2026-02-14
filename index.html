@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#171411" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Rental Property Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Great+Vibes&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=20260214t" />
+  </head>
+  <body>
+    <header class="site-header">
+      <h1 class="brand-title">Veeramma</h1>
+      <h2 class="brand-subtitle">RESIDENCY</h2>
+      <form id="editor-access-form" class="editor-access">
+        <label for="editorPin" class="editor-login-only pin-label">Access PIN</label>
+        <input type="password" id="editorPin" class="editor-login-only pin-input" placeholder="••••" maxlength="8" inputmode="numeric" />
+        <button type="button" class="btn btn-small editor-login-only" id="editorLoginBtn">Login</button>
+        <span id="editorStatus" class="editor-status editor-auth-only">View only mode</span>
+        <button type="button" class="btn btn-small btn-muted editor-logout-only" id="editorLogout">Logout</button>
+      </form>
+    </header>
+
+    <main class="container">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab-target="dashboard">Dashboard & Payments</button>
+        <button class="tab-btn" data-tab-target="available-units">Available Units</button>
+        <button class="tab-btn" data-tab-target="active-tenants">Active Tenants</button>
+        <button class="tab-btn" data-tab-target="lease-status">Lease Payment Status</button>
+        <button class="tab-btn hidden" data-tab-target="settings" id="settingsTabBtn">Settings</button>
+      </div>
+
+      <section class="tab-panel active" data-tab-panel="dashboard">
+        <section class="card metrics" id="metrics">
+          <div class="metrics-row">
+            <div class="metric-box">Total Units<strong>0</strong></div>
+            <div class="metric-box">Occupied Units<strong>0</strong></div>
+            <div class="metric-box">Vacant Units<strong>0</strong></div>
+          </div>
+        </section>
+
+        <section class="card hidden" data-always-hidden="true" id="dashboardPaymentsCard" hidden>
+          <div class="table-head">
+            <h2>Active Tenants Payment Status</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small btn-muted" id="expandDashboardTenants">Expand All</button>
+              <button type="button" class="btn btn-small btn-muted" id="collapseDashboardTenants">Collapse All</button>
+              <div class="month-control">
+                <label for="activeMonth">Payment Month</label>
+                <input type="month" id="activeMonth" />
+              </div>
+              <button type="button" class="btn btn-small icon-btn" id="exportMonthlyReport" title="Export Monthly Report (PDF)" aria-label="Export Monthly Report (PDF)">
+                <span class="printer-icon" aria-hidden="true">🖨</span>
+                <span>Print</span>
+              </button>
+            </div>
+          </div>
+          <div id="dashboardTenantGroups"></div>
+        </section>
+
+      </section>
+
+      <section class="tab-panel" data-tab-panel="active-tenants">
+        <section class="card hidden" id="activeTenantAddCard">
+          <h2>Add Tenant</h2>
+          <form id="tenant-form">
+            <div class="form-grid">
+              <label>
+                Property Name
+                <select id="propertyName" required>
+                  <option value="">Select Building - Unit</option>
+                </select>
+              </label>
+              <label>
+                Tenant Name
+                <input type="text" id="tenantName" required placeholder="John Smith" />
+              </label>
+              <label>
+                Email
+                <input type="email" id="tenantEmail" placeholder="john@email.com" />
+              </label>
+              <label>
+                Mobile Number
+                <input type="tel" id="tenantMobile" placeholder="+91 9876543210" />
+              </label>
+              <label>
+                Monthly Rent ($)
+                <input type="number" id="monthlyRent" required min="0" step="0.01" placeholder="1500" />
+              </label>
+              <label>
+                Lease Start Date
+                <input type="date" id="leaseStart" required />
+              </label>
+              <label>
+                Lease End Date
+                <input type="date" id="leaseEnd" required />
+              </label>
+              <label>
+                Security Deposit ($)
+                <input type="number" id="deposit" min="0" step="0.01" placeholder="Optional" />
+              </label>
+              <label>
+                Tenant Documents
+                <input
+                  type="file"
+                  id="tenantDocuments"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
+                />
+              </label>
+              <label>
+                Notes
+                <textarea id="tenantNotes" rows="3" placeholder="Tenant notes..."></textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn">Save Tenant</button>
+              <button type="button" class="btn btn-muted" id="cancelAddTenant">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="table-head">
+            <h2>Active Tenants (Today: <span id="todayDate"></span>)</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small btn-muted" id="expandAllActiveTenants">Expand All</button>
+              <button type="button" class="btn btn-small btn-muted" id="collapseAllActiveTenants">Collapse All</button>
+              <button type="button" class="btn" id="addTenantFromActive">Add Tenant</button>
+            </div>
+          </div>
+          <div id="activeTenantGroups"></div>
+        </section>
+
+        <section class="card hidden" id="activeTenantEditCard">
+          <h2>Edit Active Tenant</h2>
+          <form id="activeTenantEditForm">
+            <div class="form-grid">
+              <label>
+                Property Name
+                <select id="editPropertyName" required>
+                  <option value="">Select Building - Unit</option>
+                </select>
+              </label>
+              <label>
+                Tenant Name
+                <input type="text" id="editTenantName" required />
+              </label>
+              <label>
+                Email
+                <input type="email" id="editTenantEmail" />
+              </label>
+              <label>
+                Mobile Number
+                <input type="tel" id="editTenantMobile" placeholder="+91 9876543210" />
+              </label>
+              <label>
+                Monthly Rent ($)
+                <input type="number" id="editMonthlyRent" required min="0" step="0.01" />
+              </label>
+              <label>
+                Security Deposit ($)
+                <input type="number" id="editDeposit" min="0" step="0.01" />
+              </label>
+              <label>
+                Lease Start Date
+                <input type="date" id="editLeaseStart" required />
+              </label>
+              <label>
+                Lease End Date
+                <input type="date" id="editLeaseEnd" required />
+              </label>
+              <label>
+                Add Documents
+                <input
+                  type="file"
+                  id="editTenantDocuments"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.txt"
+                />
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="replaceDocuments" />
+                Replace existing documents with new uploads
+              </label>
+              <label>
+                Notes
+                <textarea id="editTenantNotes" rows="3" placeholder="Tenant notes..."></textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn">Update Tenant</button>
+              <button type="button" class="btn btn-muted" id="cancelTenantEdit">Cancel</button>
+            </div>
+          </form>
+        </section>
+      </section>
+
+      <section class="tab-panel hidden" data-tab-panel="settings" id="settingsPanel">
+        <section class="card" id="notificationConfigCard">
+          <h2>Email Notification Lists (Admin)</h2>
+          <p>Configure recipients and EmailJS service settings for direct in-app reminder sending.</p>
+          <div class="form-grid">
+            <label>
+              Administrator Emails
+              <textarea id="adminEmailList" rows="3" placeholder="admin1@mail.com, admin2@mail.com"></textarea>
+            </label>
+            <label>
+              Manager Emails
+              <textarea id="managerEmailList" rows="3" placeholder="manager1@mail.com, manager2@mail.com"></textarea>
+            </label>
+            <label>
+              EmailJS Public Key
+              <input type="text" id="emailjsPublicKey" placeholder="public key" />
+            </label>
+            <label>
+              EmailJS Service ID
+              <input type="text" id="emailjsServiceId" placeholder="service_xxx" />
+            </label>
+            <label>
+              EmailJS Template ID
+              <input type="text" id="emailjsTemplateId" placeholder="template_xxx" />
+            </label>
+            <label>
+              Sender Name
+              <input type="text" id="notifySenderName" placeholder="Rental Management" />
+            </label>
+            <label>
+              Review Email Subject Template
+              <input
+                type="text"
+                id="reviewSubjectTemplate"
+                placeholder="Payment Review Required: {unit} {tenant name}"
+              />
+            </label>
+          </div>
+          <button type="button" class="btn" id="saveNotifyConfig">Save Email Lists</button>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="lease-status">
+        <section class="card">
+          <div class="table-head">
+            <h2>Lease Duration Payment Status</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small btn-muted" id="expandLeaseStatus">Expand All</button>
+              <button type="button" class="btn btn-small btn-muted" id="collapseLeaseStatus">Collapse All</button>
+            </div>
+          </div>
+          <div id="leaseStatusGroups"></div>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="available-units">
+        <section class="card hidden" id="unitAddCard">
+          <h2 id="unitFormTitle">Unit Occupancy - Add Unit</h2>
+          <div class="unit-summary" id="unitSummary"></div>
+          <form id="unit-form">
+            <div class="form-grid">
+              <label>
+                Building Name
+                <input type="text" id="buildingName" required placeholder="Veeramma Residency" />
+              </label>
+              <label>
+                Unit Number
+                <input type="text" id="unitNumber" required placeholder="2B" />
+              </label>
+              <label>
+                Occupancy Status
+                <select id="occupancyStatus" required>
+                  <option value="vacant">Vacant</option>
+                  <option value="occupied">Occupied</option>
+                </select>
+              </label>
+              <label>
+                Tenant Name
+                <input type="text" id="unitTenantName" list="tenantNameOptions" placeholder="Optional for vacant units" />
+              </label>
+              <label>
+                Notes
+                <textarea id="unitNotes" rows="3" placeholder="Unit notes..."></textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn" id="unitSubmitBtn">Save Unit</button>
+              <button type="button" class="btn btn-muted hidden" id="cancelUnitEdit">Cancel Edit</button>
+            </div>
+          </form>
+          <datalist id="tenantNameOptions"></datalist>
+        </section>
+
+        <section class="card">
+          <div class="table-head">
+            <h2>All Building Units</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small btn-muted" id="expandUnits">Expand All</button>
+              <button type="button" class="btn btn-small btn-muted" id="collapseUnits">Collapse All</button>
+              <button type="button" class="btn" id="addUnitFromUnits">Add Unit</button>
+            </div>
+          </div>
+          <div class="unit-summary" id="unitOverallSummary"></div>
+          <h3 class="subhead">Building-wise Unit Status</h3>
+          <div class="unit-summary" id="unitBuildingSummary"></div>
+          <div id="unitGroups"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      (function () {
+        const STORAGE_KEY = "rental-manager-data-v1";
+        function readLocalUnits() {
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed.units) ? parsed.units : [];
+          } catch {
+            return [];
+          }
+        }
+        function renderMetricsFallback() {
+          const metricsEl = document.getElementById("metrics");
+          if (!metricsEl) return;
+          if (metricsEl.dataset.appRendered === "1") return;
+
+          const units = readLocalUnits();
+          const total = units.length;
+          const occupied = units.filter((unit) => unit && unit.status === "occupied").length;
+          const vacant = total - occupied;
+
+          metricsEl.innerHTML = `
+            <div class="metrics-row">
+              <div class="metric-box">Total Units<strong>${total}</strong></div>
+              <div class="metric-box">Occupied Units<strong>${occupied}</strong></div>
+              <div class="metric-box">Vacant Units<strong>${vacant}</strong></div>
+            </div>
+          `;
+          metricsEl.dataset.forceFallback = "1";
+        }
+
+        window.addEventListener("DOMContentLoaded", function () {
+          const metricsEl = document.getElementById("metrics");
+          if (!metricsEl) return;
+          setTimeout(function () {
+            if (metricsEl.dataset.appRendered !== "1") {
+              renderMetricsFallback();
+            }
+          }, 250);
+        });
+      })();
+    </script>
+    <script src="config.js?v=20260214t"></script>
+    <script src="utils.js?v=20260214t"></script>
+    <script src="app.js?v=20260214t"></script>
+  </body>
+</html>
