@@ -372,12 +372,12 @@ function groupByBuilding(items, getBuilding) {
   return [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
-function buildTenantCardHeader({ propertyLabel, tenantName, leaseStart, leaseEnd, actionsHtml = "" }) {
+function buildTenantCardHeader({ propertyLabel, tenantName, leaseStart, leaseEnd, actionsHtml = "", propertyClass = "" }) {
   const leaseText = leaseStart && leaseEnd ? `${formatDate(leaseStart)} to ${formatDate(leaseEnd)}` : "";
   return `
     <div class="tenant-card-head">
       <div>
-        <strong>${escapeHtml(propertyLabel || "-")}</strong>
+        <strong class="${escapeHtml(propertyClass)}">${escapeHtml(propertyLabel || "-")}</strong>
       </div>
       <div class="tenant-card-center">${escapeHtml(tenantName || "-")}</div>
       <div class="tenant-card-right">
@@ -430,18 +430,24 @@ function renderActiveTenantsToday() {
           const actionsContent = editAction || deleteAction ? `${editAction}${deleteAction}` : '<span>No actions</span>';
 
           const card = document.createElement("article");
-          card.className = "tenant-card";
+          card.className = "tenant-card active-tenant-card";
           if (isTenantLeaseEnded(tenant, today)) {
             card.classList.add("lease-ended-row");
           }
           card.innerHTML = `
-            ${buildTenantCardHeader({
-              propertyLabel: getTenantPropertyName(tenant),
-              tenantName: tenant.tenantName,
-              leaseStart: tenant.leaseStart,
-              leaseEnd: tenant.leaseEnd,
-              actionsHtml: actionsContent
-            })}
+            <div class="tenant-card-head">
+              <div class="payment-head-left">
+                <strong class="unit-header-badge">${escapeHtml(getTenantPropertyName(tenant))}</strong>
+                <div class="payment-tenant-name">${escapeHtml(getTenantDisplayName(tenant))}</div>
+              </div>
+              <div class="payment-lease-center">
+                <span>Lease</span>
+                <strong>${formatDate(tenant.leaseStart)} to ${formatDate(tenant.leaseEnd)}</strong>
+              </div>
+              <div class="tenant-card-right">
+                <div class="actions">${actionsContent}</div>
+              </div>
+            </div>
             <div class="tenant-card-grid">
               <div><span>Email</span><strong>${tenant.email ? escapeHtml(tenant.email) : "-"}</strong></div>
               <div><span>Mobile</span><strong>${tenant.mobile ? escapeHtml(tenant.mobile) : "-"}</strong></div>
@@ -614,19 +620,23 @@ function renderRows() {
           const payment = tenant.payments[safeMonth] || { status: "due", paidDate: "" };
           const paymentStatus = getPaymentStatus(tenant, safeMonth);
           const card = document.createElement("article");
-          card.className = "tenant-card";
+          card.className = "tenant-card payment-card";
           card.innerHTML = `
-            ${buildTenantCardHeader({
-              propertyLabel: getTenantPropertyName(tenant),
-              tenantName: tenant.tenantName,
-              leaseStart: tenant.leaseStart,
-              leaseEnd: tenant.leaseEnd,
-              actionsHtml: ""
-            })}
-            <div class="tenant-card-grid">
-              <div><span>Rent</span><strong>${money(tenant.monthlyRent)}</strong></div>
-              <div><span>Status</span><strong><span class="pill ${paymentStatus}">${formatPaymentStatus(paymentStatus)}</span></strong></div>
-              <div><span>Paid Date</span><strong>${paymentStatus === "paid" && payment.paidDate ? formatDate(payment.paidDate) : "-"}</strong></div>
+            <div class="tenant-card-head">
+              <div class="payment-head-left">
+                <strong class="unit-header-badge">${escapeHtml(getTenantPropertyName(tenant))}</strong>
+                <div class="payment-tenant-name">${escapeHtml(getTenantDisplayName(tenant))}</div>
+              </div>
+              <div class="payment-lease-center">
+                <span>Lease</span>
+                <strong>${formatDate(tenant.leaseStart)} to ${formatDate(tenant.leaseEnd)}</strong>
+              </div>
+              <div class="tenant-card-right"></div>
+            </div>
+            <div class="payment-summary-row">
+              <div class="payment-summary-item"><span>Rent</span><strong>${money(tenant.monthlyRent)}</strong></div>
+              <div class="payment-summary-item"><span>Paid Date</span><strong class="payment-date-inline">${paymentStatus === "paid" && payment.paidDate ? formatDate(payment.paidDate) : "-"}</strong></div>
+              <div class="payment-summary-item"><span>Status</span><strong><span class="pill ${paymentStatus}">${formatPaymentStatus(paymentStatus)}</span></strong></div>
             </div>
           `;
 
@@ -840,14 +850,17 @@ function renderLeaseStatusRows() {
             .join("");
 
           const card = document.createElement("article");
-          card.className = "tenant-card";
+          card.className = "tenant-card lease-status-card";
           card.innerHTML = `
-            ${buildTenantCardHeader({
-              propertyLabel: getTenantPropertyName(tenant),
-              tenantName: tenant.tenantName,
-              leaseStart: tenant.leaseStart,
-              leaseEnd: tenant.leaseEnd
-            })}
+            <div class="tenant-card-head lease-inline-head">
+              <div class="lease-inline-left">
+                <strong class="unit-header-badge">${escapeHtml(getTenantPropertyName(tenant))}</strong>
+                <span class="lease-inline-name">${escapeHtml(getTenantDisplayName(tenant))}</span>
+              </div>
+              <div class="tenant-card-right">
+                <div class="tenant-lease"><span>Lease</span><strong>${formatDate(tenant.leaseStart)} to ${formatDate(tenant.leaseEnd)}</strong></div>
+              </div>
+            </div>
             <div class="tenant-card-notes"><span>All Monthly Status:</span> <div class="lease-chip-wrap">${statusChips}</div></div>
           `;
           list.appendChild(card);
@@ -1036,31 +1049,25 @@ function renderUnits() {
             if (hasPermission("unit_edit")) {
               actions.push('<button class="btn btn-small edit-unit">Edit</button>');
             }
-            if (hasPermission("unit_set_vacant")) {
-              actions.push('<button class="btn btn-small btn-muted set-vacant">Set Vacant</button>');
-            }
             if (hasPermission("unit_delete")) {
               actions.push('<button class="btn btn-small btn-danger delete-unit">Delete</button>');
             }
             const card = document.createElement("article");
-            card.className = "tenant-card";
+            card.className = "tenant-card unit-card";
             card.dataset.unitId = unit.id;
+            const statusHtml = `<span class="unit-status-pill ${statusLabel}">${occupiedNow ? "Occupied" : "Vacant"}</span>`;
             card.innerHTML = `
               ${buildTenantCardHeader({
                 propertyLabel: getUnitLabel(unit),
                 tenantName: activeTenantName || "-",
-                actionsHtml: actions.join("") || "<span>No actions</span>"
+                actionsHtml: statusHtml,
+                propertyClass: "unit-header-badge"
               })}
-              <div class="tenant-card-grid">
-                <div><span>Status</span><strong><span class="occupancy-pill ${statusLabel}">${occupiedNow ? "Occupied" : "Vacant"}</span></strong></div>
-              </div>
+              <div class="actions unit-card-actions">${actions.join("") || "<span>No actions</span>"}</div>
               <div class="tenant-card-notes"><span>Notes:</span> ${unit.notes ? escapeHtml(unit.notes) : "-"}</div>
             `;
             if (hasPermission("unit_edit")) {
               card.querySelector(".edit-unit").addEventListener("click", () => startEditUnit(unit.id));
-            }
-            if (hasPermission("unit_set_vacant")) {
-              card.querySelector(".set-vacant").addEventListener("click", () => setUnitVacant(unit.id));
             }
             if (hasPermission("unit_delete")) {
               card.querySelector(".delete-unit").addEventListener("click", () => removeUnit(unit.id));
@@ -2050,6 +2057,14 @@ function getTenantPropertyName(tenant) {
     if (linkedUnit) return getUnitLabel(linkedUnit);
   }
   return tenant.propertyName || "-";
+}
+
+function getTenantDisplayName(tenant) {
+  if (tenant.linkedUnitId) {
+    const linkedUnit = state.units.find((unit) => unit.id === tenant.linkedUnitId);
+    if (linkedUnit?.tenantName) return linkedUnit.tenantName;
+  }
+  return tenant.tenantName || "-";
 }
 
 function getTenantUnitNumber(tenant) {

@@ -364,6 +364,19 @@ textarea:focus {
   padding: 0.7rem;
 }
 
+.unit-group .tenant-card-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-group .tenant-card-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#activeTenantGroups .tenant-card-list,
+#leaseStatusGroups .tenant-card-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .tenant-card {
   border: 1px solid rgba(79, 59, 42, 0.14);
   border-radius: 14px;
@@ -653,6 +666,318 @@ textarea:focus {
   background: #1f7a46;
 }
 
+.unit-status-pill {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 54px;
+  max-width: 100%;
+  padding: 0.1rem 0.38rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  border-radius: 999px;
+  line-height: 1;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.unit-status-pill.occupied {
+  background: #9c4f2d;
+  color: #fff;
+  border-color: #7e3e22;
+}
+
+.unit-status-pill.vacant {
+  background: #2e7b4d;
+  color: #fff;
+  border-color: #245f3b;
+}
+
+.unit-card {
+  padding: 0.46rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.64);
+  border-left: 3px solid #7b6652;
+}
+
+.unit-card .tenant-card-head {
+  gap: 0.3rem;
+  align-items: center;
+}
+
+.unit-card .tenant-card-notes {
+  margin-top: 0.26rem;
+  font-size: 0.74rem;
+  color: #3f3126;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(86, 68, 52, 0.12);
+  border-radius: 8px;
+  padding: 0.24rem 0.36rem;
+}
+
+.unit-card .tenant-card-right .actions {
+  justify-content: flex-end;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.unit-card-actions {
+  margin-top: 0.26rem;
+  justify-content: flex-end;
+  gap: 0.28rem;
+}
+
+.unit-card .tenant-card-right {
+  min-width: 0;
+}
+
+.unit-card .unit-status-pill {
+  max-width: 100%;
+}
+
+.unit-header-badge {
+  display: inline-block;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid rgba(73, 55, 40, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #241c16;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.unit-card .tenant-card-head > div:first-child,
+.payment-card .tenant-card-head > div:first-child {
+  justify-self: start;
+  text-align: left;
+}
+
+.unit-card .tenant-card-center {
+  font-size: 0.82rem;
+  color: #2f241b;
+}
+
+.unit-card .btn-small {
+  padding: 0.32rem 0.5rem;
+  font-size: 0.72rem;
+}
+
+.unit-card .tenant-card-grid span {
+  font-size: 0.7rem;
+  color: #5b4a3d;
+}
+
+.unit-card .tenant-card-grid strong {
+  font-size: 0.8rem;
+}
+
+.payment-card {
+  padding: 0.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.64);
+  border-left: 3px solid #7b6652;
+}
+
+.payment-card .tenant-card-head {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.34rem;
+  align-items: start;
+}
+
+.payment-card .tenant-card-center {
+  font-size: 0.82rem;
+  color: #2f241b;
+}
+
+.payment-head-left {
+  display: grid;
+  gap: 0.22rem;
+  justify-items: start;
+}
+
+.payment-tenant-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #2f241b;
+  text-align: left;
+}
+
+.payment-lease-center {
+  display: grid;
+  justify-items: center;
+  align-items: center;
+  gap: 0.06rem;
+  text-align: center;
+}
+
+.payment-lease-center span {
+  font-size: 0.68rem;
+  color: #655446;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.payment-lease-center strong {
+  font-size: 0.76rem;
+  color: #2f241b;
+  font-weight: 700;
+}
+
+.payment-card .tenant-card-grid {
+  margin-top: 0.28rem;
+  gap: 0.24rem 0.5rem;
+}
+
+.payment-card .tenant-card-grid span {
+  font-size: 0.7rem;
+  color: #5b4a3d;
+}
+
+.payment-card .tenant-card-grid strong {
+  font-size: 0.8rem;
+}
+
+.payment-card .payment-summary-row {
+  margin-top: 0.28rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  align-items: end;
+}
+
+.payment-card .payment-summary-item span {
+  display: block;
+  font-size: 0.7rem;
+  color: #5b4a3d;
+}
+
+.payment-card .payment-summary-item strong {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.8rem;
+}
+
+.payment-card .payment-date-inline {
+  font-size: 0.8rem;
+  color: #3f3328;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.payment-card .actions {
+  margin-top: 0.26rem;
+  gap: 0.28rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.payment-card .btn-small {
+  padding: 0.29rem 0.44rem;
+  font-size: 0.69rem;
+}
+
+.payment-card .tenant-card-right {
+  min-width: 0;
+  justify-items: end;
+}
+
+.active-tenant-card {
+  padding: 0.5rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.64);
+  border-left: 3px solid #7b6652;
+}
+
+.active-tenant-card .tenant-card-head {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.34rem;
+  align-items: start;
+}
+
+.active-tenant-card .tenant-card-right {
+  min-width: 0;
+  justify-items: end;
+}
+
+.active-tenant-card .actions {
+  flex-wrap: wrap;
+  max-width: 100%;
+  justify-content: flex-end;
+  gap: 0.28rem;
+}
+
+.active-tenant-card .btn-small {
+  padding: 0.29rem 0.44rem;
+  font-size: 0.69rem;
+}
+
+.active-tenant-card .tenant-card-grid {
+  margin-top: 0.28rem;
+  gap: 0.24rem 0.5rem;
+}
+
+.active-tenant-card .tenant-card-grid span {
+  font-size: 0.7rem;
+  color: #5b4a3d;
+}
+
+.active-tenant-card .tenant-card-grid strong {
+  font-size: 0.8rem;
+}
+
+.lease-status-card {
+  padding: 0.48rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.64);
+  border-left: 3px solid #7b6652;
+}
+
+.lease-inline-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.lease-inline-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+}
+
+.lease-inline-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #2f241b;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lease-status-card .tenant-card-notes {
+  margin-top: 0.3rem;
+  font-size: 0.76rem;
+  color: #3f3126;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(86, 68, 52, 0.12);
+  border-radius: 8px;
+  padding: 0.24rem 0.36rem;
+}
+
+.lease-status-card .lease-chip-wrap {
+  margin-top: 0.2rem;
+  gap: 0.22rem;
+}
+
+.lease-status-card .lease-chip {
+  font-size: 0.68rem;
+  padding: 0.16rem 0.34rem;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: 1fr;
@@ -787,5 +1112,18 @@ textarea:focus {
     top: 0.55rem;
     right: 0.55rem;
     max-width: calc(100vw - 1.1rem);
+  }
+
+  .unit-group .tenant-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-group .tenant-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  #activeTenantGroups .tenant-card-list,
+  #leaseStatusGroups .tenant-card-list {
+    grid-template-columns: 1fr;
   }
 }
