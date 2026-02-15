@@ -150,8 +150,15 @@ const emailjsServiceIdEl = document.getElementById("emailjsServiceId");
 const emailjsTemplateIdEl = document.getElementById("emailjsTemplateId");
 const notifySenderNameEl = document.getElementById("notifySenderName");
 const reviewSubjectTemplateEl = document.getElementById("reviewSubjectTemplate");
-const saveNotifyConfigEl = document.getElementById("saveNotifyConfig");
 const buildingAddressFieldsEl = document.getElementById("buildingAddressFields");
+const propertyAddressSectionEl = document.getElementById("propertyAddressSection");
+const mailConfigSectionEl = document.getElementById("mailConfigSection");
+const editPropertyAddressBtnEl = document.getElementById("editPropertyAddressBtn");
+const savePropertyAddressBtnEl = document.getElementById("savePropertyAddressBtn");
+const cancelPropertyAddressBtnEl = document.getElementById("cancelPropertyAddressBtn");
+const editMailConfigBtnEl = document.getElementById("editMailConfigBtn");
+const saveMailConfigBtnEl = document.getElementById("saveMailConfigBtn");
+const cancelMailConfigBtnEl = document.getElementById("cancelMailConfigBtn");
 const exportMonthlyReportBtnEl = document.getElementById("exportMonthlyReport");
 const tenantForm = document.getElementById("tenant-form");
 const activeMonthInput = document.getElementById("activeMonth");
@@ -178,6 +185,10 @@ let supabaseClient = null;
 let remoteEnabled = false;
 let sharedStateRowId = "shared";
 let supabaseDocBucket = DEFAULT_SUPABASE_DOC_BUCKET;
+const settingsEditMode = {
+  propertyAddress: false,
+  mailConfig: false
+};
 
 init();
 disableServiceWorkerAndCaches();
@@ -236,7 +247,30 @@ async function init() {
     buildingNameEl.scrollIntoView({ behavior: "smooth", block: "center" });
     buildingNameEl.focus();
   });
-  saveNotifyConfigEl.addEventListener("click", saveNotifyConfig);
+  if (editPropertyAddressBtnEl) {
+    editPropertyAddressBtnEl.addEventListener("click", () => setSettingsSectionMode("propertyAddress", true));
+  }
+  if (cancelPropertyAddressBtnEl) {
+    cancelPropertyAddressBtnEl.addEventListener("click", () => {
+      setSettingsSectionMode("propertyAddress", false);
+      renderNotifyConfig();
+    });
+  }
+  if (savePropertyAddressBtnEl) {
+    savePropertyAddressBtnEl.addEventListener("click", savePropertyAddressConfig);
+  }
+  if (editMailConfigBtnEl) {
+    editMailConfigBtnEl.addEventListener("click", () => setSettingsSectionMode("mailConfig", true));
+  }
+  if (cancelMailConfigBtnEl) {
+    cancelMailConfigBtnEl.addEventListener("click", () => {
+      setSettingsSectionMode("mailConfig", false);
+      renderNotifyConfig();
+    });
+  }
+  if (saveMailConfigBtnEl) {
+    saveMailConfigBtnEl.addEventListener("click", saveMailConfig);
+  }
   if (exportMonthlyReportBtnEl) {
     exportMonthlyReportBtnEl.addEventListener("click", exportMonthlyReportPdf);
   }
@@ -1396,11 +1430,52 @@ function renderNotifyConfig() {
   reviewSubjectTemplateEl.value =
     state.notifyConfig.reviewSubjectTemplate || "Payment Review Required: {unit} {tenant name}";
   renderBuildingAddressFields();
+  setSettingsSectionMode("propertyAddress", settingsEditMode.propertyAddress);
+  setSettingsSectionMode("mailConfig", settingsEditMode.mailConfig);
 }
 
-function saveNotifyConfig() {
+function setSettingsSectionMode(section, isEditing) {
+  const key = section === "mailConfig" ? "mailConfig" : "propertyAddress";
+  settingsEditMode[key] = Boolean(isEditing);
+  const editing = settingsEditMode[key];
+
+  if (key === "propertyAddress" && propertyAddressSectionEl) {
+    propertyAddressSectionEl
+      .querySelectorAll("input, textarea, select")
+      .forEach((field) => (field.disabled = !editing));
+    toggleSectionButtons(editPropertyAddressBtnEl, savePropertyAddressBtnEl, cancelPropertyAddressBtnEl, editing);
+  }
+
+  if (key === "mailConfig" && mailConfigSectionEl) {
+    mailConfigSectionEl
+      .querySelectorAll("input, textarea, select")
+      .forEach((field) => (field.disabled = !editing));
+    toggleSectionButtons(editMailConfigBtnEl, saveMailConfigBtnEl, cancelMailConfigBtnEl, editing);
+  }
+}
+
+function toggleSectionButtons(editBtn, saveBtn, cancelBtn, editing) {
+  if (editBtn) editBtn.classList.toggle("hidden", editing);
+  if (saveBtn) saveBtn.classList.toggle("hidden", !editing);
+  if (cancelBtn) cancelBtn.classList.toggle("hidden", !editing);
+}
+
+function savePropertyAddressConfig() {
   if (!hasPermission("manage_notify_lists")) {
-    alert("You do not have permission to manage email lists.");
+    alert("You do not have permission to manage property settings.");
+    return;
+  }
+  state.notifyConfig.buildingAddresses = getBuildingAddressesFromSettings();
+  state.notifyConfig.buildingLandlords = getBuildingLandlordsFromSettings();
+  saveState();
+  setSettingsSectionMode("propertyAddress", false);
+  renderNotifyConfig();
+  alert("Property address section saved.");
+}
+
+function saveMailConfig() {
+  if (!hasPermission("manage_notify_lists")) {
+    alert("You do not have permission to manage mail settings.");
     return;
   }
   state.notifyConfig.admins = parseEmailList(adminEmailListEl.value);
@@ -1411,10 +1486,10 @@ function saveNotifyConfig() {
   state.notifyConfig.senderName = notifySenderNameEl.value.trim() || "Rental Management";
   state.notifyConfig.reviewSubjectTemplate =
     reviewSubjectTemplateEl.value.trim() || "Payment Review Required: {unit} {tenant name}";
-  state.notifyConfig.buildingAddresses = getBuildingAddressesFromSettings();
-  state.notifyConfig.buildingLandlords = getBuildingLandlordsFromSettings();
   saveState();
-  alert("Notification, email service settings, and building details saved.");
+  setSettingsSectionMode("mailConfig", false);
+  renderNotifyConfig();
+  alert("Mail server configuration section saved.");
 }
 
 function exportMonthlyReportPdf() {

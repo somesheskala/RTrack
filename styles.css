@@ -1122,6 +1122,20 @@ textarea:focus {
   font-weight: 700;
 }
 
+.settings-section {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.building-setting-group {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(85, 68, 50, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
 #unitAddCard {
   overflow: hidden;
 }

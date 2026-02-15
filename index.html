@@ -18,7 +18,7 @@
       rel="stylesheet"
     />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260214bl" />
+    <link rel="stylesheet" href="styles.css?v=20260214bm" />
   </head>
   <body>
     <header class="site-header">
@@ -210,11 +210,29 @@
       </section>
 
       <section class="tab-panel hidden" data-tab-panel="settings" id="settingsPanel">
-        <section class="card" id="notificationConfigCard">
-          <h2>Email Notification Lists (Admin)</h2>
-          <p>Configure recipients and EmailJS service settings for direct in-app reminder sending.</p>
-          <h3 class="subhead">Building Landlord Name and Address (Used in Rental Receipt)</h3>
+        <section class="card settings-section" id="propertyAddressSection">
+          <div class="table-head">
+            <h2>Property Address</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small" id="editPropertyAddressBtn">Edit</button>
+              <button type="button" class="btn btn-small hidden" id="savePropertyAddressBtn">Save</button>
+              <button type="button" class="btn btn-small btn-muted hidden" id="cancelPropertyAddressBtn">Cancel</button>
+            </div>
+          </div>
+          <p>Configure building-wise landlord name and address used in rental receipts.</p>
           <div id="buildingAddressFields" class="form-grid"></div>
+        </section>
+
+        <section class="card settings-section" id="mailConfigSection">
+          <div class="table-head">
+            <h2>Mail Server Configurations</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small" id="editMailConfigBtn">Edit</button>
+              <button type="button" class="btn btn-small hidden" id="saveMailConfigBtn">Save</button>
+              <button type="button" class="btn btn-small btn-muted hidden" id="cancelMailConfigBtn">Cancel</button>
+            </div>
+          </div>
+          <p>Configure recipient lists and EmailJS service details for reminder and review mails.</p>
           <div class="form-grid">
             <label>
               Administrator Emails
@@ -249,7 +267,6 @@
               />
             </label>
           </div>
-          <button type="button" class="btn" id="saveNotifyConfig">Save Email Lists</button>
         </section>
       </section>
 
@@ -363,8 +380,8 @@
         });
       })();
     </script>
-    <script src="config.js?v=20260214bl"></script>
-    <script src="utils.js?v=20260214bl"></script>
-    <script src="app.js?v=20260214bl"></script>
+    <script src="config.js?v=20260214bm"></script>
+    <script src="utils.js?v=20260214bm"></script>
+    <script src="app.js?v=20260214bm"></script>
   </body>
 </html>
