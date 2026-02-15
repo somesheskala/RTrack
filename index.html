@@ -18,7 +18,7 @@
       rel="stylesheet"
     />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260214ba" />
+    <link rel="stylesheet" href="styles.css?v=20260214bk" />
   </head>
   <body>
     <header class="site-header">
@@ -132,18 +132,6 @@
           </form>
         </section>
 
-        <section class="card">
-          <div class="table-head">
-            <h2>Active Tenants (Today: <span id="todayDate"></span>)</h2>
-            <div class="table-actions">
-              <button type="button" class="btn btn-small btn-muted" id="expandAllActiveTenants">Expand All</button>
-              <button type="button" class="btn btn-small btn-muted" id="collapseAllActiveTenants">Collapse All</button>
-              <button type="button" class="btn" id="addTenantFromActive">Add Tenant</button>
-            </div>
-          </div>
-          <div id="activeTenantGroups"></div>
-        </section>
-
         <section class="card hidden" id="activeTenantEditCard">
           <h2>Edit Active Tenant</h2>
           <form id="activeTenantEditForm">
@@ -195,6 +183,7 @@
                 <input type="checkbox" id="replaceDocuments" />
                 Replace existing documents with new uploads
               </label>
+              <div class="existing-docs" id="editExistingDocs"></div>
               <label>
                 Notes
                 <textarea id="editTenantNotes" rows="3" placeholder="Tenant notes..."></textarea>
@@ -206,12 +195,26 @@
             </div>
           </form>
         </section>
+
+        <section class="card">
+          <div class="table-head">
+            <h2>Active Tenants (Today: <span id="todayDate"></span>)</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small btn-muted" id="expandAllActiveTenants">Expand All</button>
+              <button type="button" class="btn btn-small btn-muted" id="collapseAllActiveTenants">Collapse All</button>
+              <button type="button" class="btn" id="addTenantFromActive">Add Tenant</button>
+            </div>
+          </div>
+          <div id="activeTenantGroups"></div>
+        </section>
       </section>
 
       <section class="tab-panel hidden" data-tab-panel="settings" id="settingsPanel">
         <section class="card" id="notificationConfigCard">
           <h2>Email Notification Lists (Admin)</h2>
           <p>Configure recipients and EmailJS service settings for direct in-app reminder sending.</p>
+          <h3 class="subhead">Building Landlord Name and Address (Used in Rental Receipt)</h3>
+          <div id="buildingAddressFields" class="form-grid"></div>
           <div class="form-grid">
             <label>
               Administrator Emails
@@ -253,7 +256,7 @@
       <section class="tab-panel" data-tab-panel="lease-status">
         <section class="card">
           <div class="table-head">
-            <h2>Lease Duration Payment Status</h2>
+            <h2>Lease Duration Payment Status (<span id="leaseStatusMonthLabel"></span>)</h2>
             <div class="table-actions">
               <button type="button" class="btn btn-small btn-muted" id="expandLeaseStatus">Expand All</button>
               <button type="button" class="btn btn-small btn-muted" id="collapseLeaseStatus">Collapse All</button>
@@ -285,7 +288,9 @@
               </label>
               <label>
                 Tenant Name
-                <input type="text" id="unitTenantName" list="tenantNameOptions" placeholder="Optional for vacant units" />
+                <select id="unitTenantName">
+                  <option value="">Select tenant from Active Tenants</option>
+                </select>
               </label>
               <label>
                 Notes
@@ -297,7 +302,6 @@
               <button type="button" class="btn btn-muted" id="cancelUnitEdit">Cancel</button>
             </div>
           </form>
-          <datalist id="tenantNameOptions"></datalist>
         </section>
 
         <section class="card">
@@ -359,8 +363,8 @@
         });
       })();
     </script>
-    <script src="config.js?v=20260214ba"></script>
-    <script src="utils.js?v=20260214ba"></script>
-    <script src="app.js?v=20260214ba"></script>
+    <script src="config.js?v=20260214bk"></script>
+    <script src="utils.js?v=20260214bk"></script>
+    <script src="app.js?v=20260214bk"></script>
   </body>
 </html>

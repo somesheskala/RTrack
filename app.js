@@ -78,6 +78,9 @@ const {
 const STORAGE_KEY = "rental-manager-data-v1";
 const EDIT_ACCESS_KEY = "rental-manager-edit-access-v1";
 const REMOTE_FALLBACK_WARNED_KEY = "rental-manager-remote-fallback-warned";
+const LOCAL_DOC_TOTAL_LIMIT_BYTES = 3 * 1024 * 1024;
+const LOCAL_DOC_SINGLE_FILE_LIMIT_BYTES = 700 * 1024;
+const DEFAULT_SUPABASE_DOC_BUCKET = "tenant-documents";
 const EDIT_USERS = [
   { username: "viewer", pin: "1111", role: "viewer" },
   { username: "manager", pin: "2222", role: "manager" },
@@ -96,7 +99,9 @@ const state = {
     emailjsServiceId: "",
     emailjsTemplateId: "",
     senderName: "Rental Management",
-    reviewSubjectTemplate: "Payment Review Required: {unit} {tenant name}"
+    reviewSubjectTemplate: "Payment Review Required: {unit} {tenant name}",
+    buildingAddresses: {},
+    buildingLandlords: {}
   }
 };
 
@@ -106,6 +111,7 @@ const todayDateEl = document.getElementById("todayDate");
 const activeTenantAddCardEl = document.getElementById("activeTenantAddCard");
 const activeTenantEditCardEl = document.getElementById("activeTenantEditCard");
 const activeTenantEditFormEl = document.getElementById("activeTenantEditForm");
+const editExistingDocsEl = document.getElementById("editExistingDocs");
 const cancelTenantEditEl = document.getElementById("cancelTenantEdit");
 const cancelAddTenantEl = document.getElementById("cancelAddTenant");
 const addTenantFromActiveEl = document.getElementById("addTenantFromActive");
@@ -128,13 +134,13 @@ const collapseUnitsEl = document.getElementById("collapseUnits");
 const unitSummaryEl = document.getElementById("unitSummary");
 const unitOverallSummaryEl = document.getElementById("unitOverallSummary");
 const unitBuildingSummaryEl = document.getElementById("unitBuildingSummary");
-const tenantNameOptionsEl = document.getElementById("tenantNameOptions");
 const propertyNameSelectEl = document.getElementById("propertyName");
 const editPropertyNameSelectEl = document.getElementById("editPropertyName");
 const dashboardTenantGroupsEl = document.getElementById("dashboardTenantGroups");
 const expandDashboardTenantsEl = document.getElementById("expandDashboardTenants");
 const collapseDashboardTenantsEl = document.getElementById("collapseDashboardTenants");
 const leaseStatusGroupsEl = document.getElementById("leaseStatusGroups");
+const leaseStatusMonthLabelEl = document.getElementById("leaseStatusMonthLabel");
 const expandLeaseStatusEl = document.getElementById("expandLeaseStatus");
 const collapseLeaseStatusEl = document.getElementById("collapseLeaseStatus");
 const adminEmailListEl = document.getElementById("adminEmailList");
@@ -145,6 +151,7 @@ const emailjsTemplateIdEl = document.getElementById("emailjsTemplateId");
 const notifySenderNameEl = document.getElementById("notifySenderName");
 const reviewSubjectTemplateEl = document.getElementById("reviewSubjectTemplate");
 const saveNotifyConfigEl = document.getElementById("saveNotifyConfig");
+const buildingAddressFieldsEl = document.getElementById("buildingAddressFields");
 const exportMonthlyReportBtnEl = document.getElementById("exportMonthlyReport");
 const tenantForm = document.getElementById("tenant-form");
 const activeMonthInput = document.getElementById("activeMonth");
@@ -165,10 +172,12 @@ const editorLogoutEl = document.getElementById("editorLogout");
 const editorStatusEl = document.getElementById("editorStatus");
 let editingTenantId = "";
 let editingUnitId = "";
+let editDocKeysToDelete = new Set();
 let editorUser = "";
 let supabaseClient = null;
 let remoteEnabled = false;
 let sharedStateRowId = "shared";
+let supabaseDocBucket = DEFAULT_SUPABASE_DOC_BUCKET;
 
 init();
 disableServiceWorkerAndCaches();
@@ -189,6 +198,9 @@ async function init() {
   });
   activeTenantEditFormEl.addEventListener("submit", onEditTenant);
   cancelTenantEditEl.addEventListener("click", cancelEditTenant);
+  if (editExistingDocsEl) {
+    editExistingDocsEl.addEventListener("click", onEditExistingDocAction);
+  }
   cancelAddTenantEl.addEventListener("click", () => {
     tenantForm.reset();
     activeTenantAddCardEl.classList.add("hidden");
@@ -284,17 +296,28 @@ async function onAddTenant(event) {
     alert(`This unit is already occupied by ${conflictingTenant.tenantName} for overlapping lease dates.`);
     return;
   }
+  const localDocCheck = validateLocalDocumentUpload(documentFiles);
+  if (!localDocCheck.ok) {
+    alert(localDocCheck.message);
+    return;
+  }
 
   let documents = [];
+  const tenantId = crypto.randomUUID();
   try {
-    documents = await readFilesAsDocuments(documentFiles);
-  } catch {
-    alert("Failed to read one or more attached documents.");
+    documents = await readFilesAsDocuments(documentFiles, { tenantId });
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (message) {
+      alert(message);
+    } else {
+      alert("Failed to store one or more attached documents.");
+    }
     return;
   }
 
   const tenant = {
-    id: crypto.randomUUID(),
+    id: tenantId,
     propertyName: getUnitLabelById(propertyNameSelectEl.value),
     tenantName: document.getElementById("tenantName").value.trim(),
     email: document.getElementById("tenantEmail").value.trim(),
@@ -495,6 +518,7 @@ function renderMetrics() {
   if (!metricsEl) return;
   const monthKey = sanitizeMonthKey(state.activeMonth);
   state.activeMonth = monthKey;
+  const currentMonthLabel = formatMonth(getCurrentMonth());
   const occupancy = getUnitOccupancySummary();
   const buildingUnitCounts = new Map(occupancy.byBuilding);
   const sortedBuildingCounts = [...buildingUnitCounts.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -513,7 +537,7 @@ function renderMetrics() {
 
   if (!isAuthenticated()) {
     metricsEl.innerHTML = `
-      <div class="metrics-section-title">Units</div>
+      <div class="metrics-section-title">Units (${escapeHtml(currentMonthLabel)})</div>
       <div class="metrics-row">
         <div class="metric-box">Total Units<strong>${totalUnits}</strong><small>${escapeHtml(availableByBuilding || "-")}</small></div>
         <div class="metric-box">Occupied Units<strong>${occupiedUnits}</strong><small>${escapeHtml(occupiedByBuilding || "-")}</small></div>
@@ -558,7 +582,7 @@ function renderMetrics() {
     .join("<br>");
 
   metricsEl.innerHTML = `
-    <div class="metrics-section-title">Units</div>
+    <div class="metrics-section-title">Units (${escapeHtml(currentMonthLabel)})</div>
     <div class="metrics-row">
       <div class="metric-box">Total Units<strong>${totalUnits}</strong><small>${escapeHtml(availableByBuilding || "-")}</small></div>
       <div class="metric-box">Occupied Units<strong>${occupiedUnits}</strong><small>${escapeHtml(occupiedByBuilding || "-")}</small></div>
@@ -584,6 +608,7 @@ function renderRows() {
   dashboardTenantGroupsEl.innerHTML = "";
   const safeMonth = sanitizeMonthKey(state.activeMonth);
   state.activeMonth = safeMonth;
+  const monthLabel = formatMonth(safeMonth);
   const activeTenants = getActiveTenantsForMonth(safeMonth);
 
   if (!activeTenants.length) {
@@ -605,7 +630,7 @@ function renderRows() {
       group.open = openDashboardGroups.has(building);
       group.innerHTML = `
         <summary>
-          <span>${escapeHtml(building)}</span>
+          <span>${escapeHtml(building)} (${escapeHtml(monthLabel)})</span>
           <span class="tenant-group-count">Paid: ${paidTenantCount}/${tenants.length} | Collected: ${money(collectedForBuilding)}</span>
         </summary>
       `;
@@ -644,7 +669,7 @@ function renderRows() {
           actionsCell.className = "actions";
           const rightCell = card.querySelector(".tenant-card-right");
 
-          if (hasPermission("mark_paid")) {
+          if (hasPermission("mark_paid") && paymentStatus !== "paid") {
             const markPaidBtn = document.createElement("button");
             markPaidBtn.type = "button";
             markPaidBtn.className = "btn btn-small mark-paid";
@@ -653,22 +678,13 @@ function renderRows() {
             actionsCell.appendChild(markPaidBtn);
           }
 
-          if (hasPermission("mark_unpaid")) {
+          if (hasPermission("mark_unpaid") && paymentStatus === "paid") {
             const markUnpaidBtn = document.createElement("button");
             markUnpaidBtn.type = "button";
             markUnpaidBtn.className = "btn btn-small btn-muted mark-unpaid";
             markUnpaidBtn.textContent = "Mark Unpaid";
             markUnpaidBtn.addEventListener("click", () => markUnpaid(tenant.id));
             actionsCell.appendChild(markUnpaidBtn);
-          }
-
-          if (hasPermission("tenant_delete")) {
-            const deleteBtn = document.createElement("button");
-            deleteBtn.type = "button";
-            deleteBtn.className = "btn btn-small btn-danger delete";
-            deleteBtn.textContent = "Delete";
-            deleteBtn.addEventListener("click", () => removeTenant(tenant.id));
-            actionsCell.appendChild(deleteBtn);
           }
 
           if (hasPermission("notify_tenant") && paymentStatus !== "paid") {
@@ -717,7 +733,19 @@ function printRentalReceipt(tenant, monthKey) {
     return;
   }
 
-  const paidDate = payment.paidDate ? formatDate(payment.paidDate) : formatDate(new Date().toISOString().slice(0, 10));
+  const buildingName = getTenantBuildingName(tenant);
+  const unitNumber = getTenantUnitNumber(tenant);
+  const buildingUnitLabel = `#${buildingName}, ${unitNumber}`;
+  const buildingAddress = getBuildingAddress(buildingName);
+  const printableAddress = buildingAddress ? `${buildingUnitLabel} ${buildingAddress}` : buildingUnitLabel;
+  const paidDateRaw = payment.paidDate || new Date().toISOString().slice(0, 10);
+  const paidDate = formatDateDdMmYyyy(paidDateRaw);
+  const paidPeriod = formatMonth(monthKey);
+  const amountValue = Number(tenant.monthlyRent || 0);
+  const amountWords = numberToWordsIndian(amountValue);
+  const paymentMode = "Bank Transfer";
+  const paymentRef = payment.refNo || payment.referenceNo || payment.utr || "-";
+  const landlordName = getBuildingLandlord(buildingName) || state.notifyConfig.senderName || "Rental Management";
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     alert("Popup blocked. Please allow popups and try again.");
@@ -729,29 +757,39 @@ function printRentalReceipt(tenant, monthKey) {
       <head>
         <title>Rental Receipt - ${escapeHtml(getTenantPropertyName(tenant))}</title>
         <style>
-          body { font-family: Arial, sans-serif; color: #161616; margin: 0; padding: 28px; }
-          .receipt { max-width: 720px; margin: 0 auto; border: 1px solid #ddd; border-radius: 10px; padding: 18px; }
-          h1 { margin: 0 0 12px; font-size: 22px; }
-          .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin-top: 10px; }
-          .meta div { font-size: 14px; }
-          .label { color: #666; display: block; font-size: 12px; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
-          .amount { margin-top: 14px; padding: 12px; background: #f5f0ea; border: 1px solid #e2d8ca; border-radius: 8px; font-size: 20px; font-weight: 700; }
-          .sign { margin-top: 34px; font-size: 13px; color: #444; }
+          body { font-family: "Times New Roman", serif; color: #111; margin: 0; padding: 28px; }
+          .receipt { max-width: 820px; margin: 0 auto; border: 1px solid #222; padding: 26px; }
+          h1 { margin: 0 0 18px; font-size: 30px; text-align: center; letter-spacing: 0.08em; }
+          p { margin: 12px 0; font-size: 18px; line-height: 1.5; }
+          .line { display: inline-block; border-bottom: 1px solid #222; padding: 0 4px; min-width: 60px; }
+          .line-wide { min-width: 360px; }
+          .line-medium { min-width: 220px; }
+          .line-small { min-width: 120px; }
+          .sign-row { margin-top: 34px; }
         </style>
       </head>
       <body>
         <div class="receipt">
-          <h1>Rental Payment Receipt</h1>
-          <div class="meta">
-            <div><span class="label">Property</span>${escapeHtml(getTenantPropertyName(tenant))}</div>
-            <div><span class="label">Receipt Month</span>${escapeHtml(formatMonth(monthKey))}</div>
-            <div><span class="label">Tenant Name</span>${escapeHtml(tenant.tenantName)}</div>
-            <div><span class="label">Paid Date</span>${escapeHtml(paidDate)}</div>
-            <div><span class="label">Building</span>${escapeHtml(getTenantBuildingName(tenant))}</div>
-            <div><span class="label">Mobile</span>${escapeHtml(tenant.mobile || "-")}</div>
-          </div>
-          <div class="amount">Amount Received: ${money(tenant.monthlyRent)}</div>
-          <div class="sign">Authorized by: ${escapeHtml(state.notifyConfig.senderName || "Rental Management")}</div>
+          <h1>RENT RECEIPT</h1>
+          <p>Date: <span class="line line-small">${escapeHtml(paidDate)}</span></p>
+          <p>
+            Received a sum of ₹<span class="line line-small">${escapeHtml(String(amountValue))}</span>
+            (in words: <span class="line line-wide">${escapeHtml(amountWords)}</span>)
+            from Mr./Ms. <span class="line line-medium">${escapeHtml(tenant.tenantName || "-")}</span>
+            towards the rent of the premises located at
+            <span class="line line-wide">${escapeHtml(printableAddress)}</span>
+            for the period <span class="line line-small">${escapeHtml(paidPeriod)}</span>.
+          </p>
+          <p>
+            Payment Mode: Cash / Cheque / Bank Transfer
+            (UTR/Ref No: <span class="line line-medium">${escapeHtml(paymentMode === "Bank Transfer" ? paymentRef : "-")}</span>)
+          </p>
+          <p class="sign-row">
+            Landlord Name: <span class="line line-medium">${escapeHtml(landlordName)}</span>
+          </p>
+          <p>
+            Landlord Signature: <span class="line line-medium"></span>
+          </p>
         </div>
       </body>
     </html>
@@ -759,6 +797,75 @@ function printRentalReceipt(tenant, monthKey) {
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();
+}
+
+function formatDateDdMmYyyy(yyyyMmDd) {
+  const raw = String(yyyyMmDd || "").trim();
+  if (!raw) return "-";
+  const parts = raw.split("-");
+  if (parts.length !== 3) return raw;
+  const [year, month, day] = parts;
+  return `${day}/${month}/${year}`;
+}
+
+function numberToWordsIndian(amount) {
+  const n = Math.floor(Number(amount || 0));
+  if (!Number.isFinite(n) || n <= 0) return "zero rupees only";
+  const ones = [
+    "",
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen"
+  ];
+  const tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+
+  function twoDigits(num) {
+    if (num < 20) return ones[num];
+    const t = Math.floor(num / 10);
+    const o = num % 10;
+    return `${tens[t]}${o ? ` ${ones[o]}` : ""}`.trim();
+  }
+
+  function threeDigits(num) {
+    const h = Math.floor(num / 100);
+    const rem = num % 100;
+    const hText = h ? `${ones[h]} hundred` : "";
+    const rText = rem ? twoDigits(rem) : "";
+    return `${hText}${hText && rText ? " " : ""}${rText}`.trim();
+  }
+
+  let value = n;
+  const crore = Math.floor(value / 10000000);
+  value %= 10000000;
+  const lakh = Math.floor(value / 100000);
+  value %= 100000;
+  const thousand = Math.floor(value / 1000);
+  value %= 1000;
+  const rest = value;
+
+  const parts = [];
+  if (crore) parts.push(`${twoDigits(crore)} crore`);
+  if (lakh) parts.push(`${twoDigits(lakh)} lakh`);
+  if (thousand) parts.push(`${twoDigits(thousand)} thousand`);
+  if (rest) parts.push(threeDigits(rest));
+
+  return `${parts.join(" ").trim()} rupees only`;
 }
 
 function getBuildingTotalsForMonth(monthKey, activeTenants) {
@@ -804,6 +911,10 @@ function getBuildingDepositTotals(activeTenants) {
 
 function renderLeaseStatusRows() {
   leaseStatusGroupsEl.innerHTML = "";
+  const currentMonthKey = getCurrentMonth();
+  if (leaseStatusMonthLabelEl) {
+    leaseStatusMonthLabelEl.textContent = formatMonth(currentMonthKey);
+  }
 
   if (!state.tenants.length) {
     const empty = document.createElement("div");
@@ -816,7 +927,7 @@ function renderLeaseStatusRows() {
   groupByBuilding(state.tenants, getTenantBuildingName).forEach(([building, tenants]) => {
       const dueMonthsCount = tenants.reduce((sum, tenant) => {
         const tenantDueMonths = getLeaseMonths(tenant.leaseStart, tenant.leaseEnd).reduce((count, monthKey) => {
-          if (monthKey > state.activeMonth) return count;
+          if (monthKey > currentMonthKey) return count;
           const status = getPaymentStatus(tenant, monthKey);
           return status === "paid" ? count : count + 1;
         }, 0);
@@ -841,11 +952,14 @@ function renderLeaseStatusRows() {
         .forEach((tenant) => {
           const statusChips = getLeaseMonths(tenant.leaseStart, tenant.leaseEnd)
             .map((monthKey) => {
-              if (monthKey > state.activeMonth) {
+              const paymentStatus = getPaymentStatus(tenant, monthKey);
+              if (paymentStatus === "paid") {
+                return `<span class="lease-chip paid">${formatMonthShort(monthKey)}: Paid</span>`;
+              }
+              if (monthKey > currentMonthKey) {
                 return `<span class="lease-chip future">${formatMonthShort(monthKey)}: Future</span>`;
               }
-              const paymentStatus = getPaymentStatus(tenant, monthKey);
-              return `<span class="lease-chip ${paymentStatus}">${formatMonthShort(monthKey)}: ${formatPaymentStatus(paymentStatus)}</span>`;
+              return `<span class="lease-chip due">${formatMonthShort(monthKey)}: Due</span>`;
             })
             .join("");
 
@@ -937,7 +1051,9 @@ function removeTenant(tenantId) {
   if (!approved) return;
   const tenant = state.tenants.find((entry) => entry.id === tenantId);
   const linkedUnitId = tenant?.linkedUnitId || "";
+  const docsToDelete = Array.isArray(tenant?.documents) ? tenant.documents : [];
   state.tenants = state.tenants.filter((entry) => entry.id !== tenantId);
+  deleteRemoteDocuments(docsToDelete).catch(() => {});
   if (linkedUnitId) {
     const stillLinked = state.tenants.some((entry) => entry.linkedUnitId === linkedUnitId);
     if (!stillLinked) {
@@ -970,8 +1086,12 @@ function onAddUnit(event) {
     return;
   }
 
+  const currentEditingUnitId = editingUnitId || "";
+
   const newUnitKey = getUnitKey(buildingName, unitNumber);
-  const existingUnit = state.units.find((unit) => unit.id !== editingUnitId && getUnitKey(unit.buildingName, unit.unitNumber) === newUnitKey);
+  const existingUnit = state.units.find(
+    (unit) => unit.id !== currentEditingUnitId && getUnitKey(unit.buildingName, unit.unitNumber) === newUnitKey
+  );
   if (existingUnit) {
     setActiveTab("available-units");
     setTimeout(() => {
@@ -987,6 +1107,38 @@ function onAddUnit(event) {
     return;
   }
 
+  if (status === "occupied") {
+    const tenantAssignedElsewhere = state.units.find(
+      (unit) =>
+        unit.id !== currentEditingUnitId &&
+        unit.status === "occupied" &&
+        String(unit.tenantName || "").trim().toLowerCase() === tenantName.toLowerCase()
+    );
+    if (tenantAssignedElsewhere) {
+      alert(
+        `Tenant "${tenantName}" is already tagged to ${tenantAssignedElsewhere.buildingName} - ${tenantAssignedElsewhere.unitNumber}. One tenant can be tagged to only one unit.`
+      );
+      return;
+    }
+
+    const selectedTenant = state.tenants.find(
+      (tenant) => String(tenant.tenantName || "").trim().toLowerCase() === tenantName.toLowerCase()
+    );
+    if (selectedTenant && selectedTenant.linkedUnitId && selectedTenant.linkedUnitId !== currentEditingUnitId) {
+      const linkedUnit = state.units.find((entry) => entry.id === selectedTenant.linkedUnitId);
+      const linkedLabel = linkedUnit ? `${linkedUnit.buildingName} - ${linkedUnit.unitNumber}` : "another unit";
+      alert(`Tenant "${selectedTenant.tenantName}" is already linked to ${linkedLabel}.`);
+      return;
+    }
+  }
+
+  const previousUnitState = editingUnitId
+    ? state.units.find((entry) => entry.id === editingUnitId)
+    : null;
+  const previousTenantName = previousUnitState?.tenantName || "";
+  const previousStatus = previousUnitState?.status || "vacant";
+
+  let savedUnit = null;
   if (editingUnitId) {
     const unit = state.units.find((entry) => entry.id === editingUnitId);
     if (!unit) return;
@@ -995,20 +1147,79 @@ function onAddUnit(event) {
     unit.status = status;
     unit.tenantName = tenantName;
     unit.notes = notes;
+    savedUnit = unit;
   } else {
-    state.units.push({
+    savedUnit = {
       id: crypto.randomUUID(),
       buildingName,
       unitNumber,
       status,
       tenantName,
       notes
-    });
+    };
+    state.units.push(savedUnit);
   }
+
+  syncTenantLinksFromUnit(savedUnit, {
+    previousTenantName,
+    previousStatus
+  });
 
   resetUnitForm();
   saveState();
   renderAll();
+}
+
+function syncTenantLinksFromUnit(unit, options = {}) {
+  if (!unit) return;
+  const previousTenantName = String(options.previousTenantName || "").trim();
+  const previousStatus = String(options.previousStatus || "vacant");
+  const currentTenantName = String(unit.tenantName || "").trim();
+  const isOccupied = unit.status === "occupied" && currentTenantName;
+
+  const clearLinkByUnitId = () => {
+    state.tenants.forEach((tenant) => {
+      if (tenant.linkedUnitId === unit.id) {
+        tenant.linkedUnitId = "";
+        tenant.propertyName = "";
+      }
+    });
+  };
+
+  const clearSpecificTenantLink = (tenantName) => {
+    const name = String(tenantName || "").trim().toLowerCase();
+    if (!name) return;
+    state.tenants.forEach((tenant) => {
+      if (String(tenant.tenantName || "").trim().toLowerCase() === name && tenant.linkedUnitId === unit.id) {
+        tenant.linkedUnitId = "";
+        tenant.propertyName = "";
+      }
+    });
+  };
+
+  if (!isOccupied) {
+    clearLinkByUnitId();
+    return;
+  }
+
+  const selectedTenant = state.tenants.find(
+    (tenant) => String(tenant.tenantName || "").trim().toLowerCase() === currentTenantName.toLowerCase()
+  );
+  if (!selectedTenant) return;
+
+  if (previousStatus === "occupied" && previousTenantName && previousTenantName.toLowerCase() !== currentTenantName.toLowerCase()) {
+    clearSpecificTenantLink(previousTenantName);
+  }
+
+  state.tenants.forEach((tenant) => {
+    if (tenant.linkedUnitId === unit.id && tenant.id !== selectedTenant.id) {
+      tenant.linkedUnitId = "";
+      tenant.propertyName = "";
+    }
+  });
+
+  selectedTenant.linkedUnitId = unit.id;
+  selectedTenant.propertyName = getUnitLabel(unit);
 }
 
 function renderUnits() {
@@ -1184,6 +1395,7 @@ function renderNotifyConfig() {
   notifySenderNameEl.value = state.notifyConfig.senderName || "Rental Management";
   reviewSubjectTemplateEl.value =
     state.notifyConfig.reviewSubjectTemplate || "Payment Review Required: {unit} {tenant name}";
+  renderBuildingAddressFields();
 }
 
 function saveNotifyConfig() {
@@ -1199,8 +1411,10 @@ function saveNotifyConfig() {
   state.notifyConfig.senderName = notifySenderNameEl.value.trim() || "Rental Management";
   state.notifyConfig.reviewSubjectTemplate =
     reviewSubjectTemplateEl.value.trim() || "Payment Review Required: {unit} {tenant name}";
+  state.notifyConfig.buildingAddresses = getBuildingAddressesFromSettings();
+  state.notifyConfig.buildingLandlords = getBuildingLandlordsFromSettings();
   saveState();
-  alert("Notification and email service settings saved.");
+  alert("Notification, email service settings, and building details saved.");
 }
 
 function exportMonthlyReportPdf() {
@@ -1483,8 +1697,16 @@ function removeUnit(unitId) {
 }
 
 function renderTenantNameOptions() {
-  const uniqueNames = [...new Set(state.tenants.map((tenant) => tenant.tenantName).filter(Boolean))];
-  tenantNameOptionsEl.innerHTML = uniqueNames.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
+  if (!unitTenantNameEl) return;
+  const currentValue = unitTenantNameEl.value;
+  const uniqueNames = [...new Set(state.tenants.map((tenant) => tenant.tenantName).filter(Boolean))]
+    .sort((a, b) => String(a).localeCompare(String(b), undefined, { sensitivity: "base" }));
+  unitTenantNameEl.innerHTML =
+    `<option value="">Select tenant from Active Tenants</option>` +
+    uniqueNames.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+  if (currentValue && uniqueNames.includes(currentValue)) {
+    unitTenantNameEl.value = currentValue;
+  }
 }
 
 function renderPropertyNameOptions() {
@@ -1568,6 +1790,8 @@ async function initializeDataLayer() {
   const supabaseUrl = String(appConfig.SUPABASE_URL || "").trim();
   const supabaseAnonKey = String(appConfig.SUPABASE_ANON_KEY || "").trim();
   sharedStateRowId = String(appConfig.SHARED_STATE_ROW_ID || "shared").trim() || "shared";
+  supabaseDocBucket =
+    String(appConfig.SUPABASE_STORAGE_BUCKET || DEFAULT_SUPABASE_DOC_BUCKET).trim() || DEFAULT_SUPABASE_DOC_BUCKET;
 
   if (supabaseUrl && supabaseAnonKey && window.supabase?.createClient) {
     supabaseClient = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
@@ -1598,22 +1822,30 @@ function loadLocalState() {
 function saveState() {
   if (remoteEnabled) {
     saveRemoteState().catch(() => {
-      saveLocalState();
-      if (!localStorage.getItem(REMOTE_FALLBACK_WARNED_KEY)) {
-        alert("Remote sync failed. Saved locally on this device.");
-        localStorage.setItem(REMOTE_FALLBACK_WARNED_KEY, "1");
+      const savedLocal = saveLocalState(false);
+      if (savedLocal) {
+        if (!localStorage.getItem(REMOTE_FALLBACK_WARNED_KEY)) {
+          alert("Remote sync failed. Saved locally on this device.");
+          localStorage.setItem(REMOTE_FALLBACK_WARNED_KEY, "1");
+        }
+      } else {
+        alert("Remote sync failed and local backup could not be saved. Please retry after internet is stable.");
       }
     });
     return;
   }
-  saveLocalState();
+  saveLocalState(true);
 }
 
-function saveLocalState() {
+function saveLocalState(showAlert = true) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(getSerializedState()));
+    return true;
   } catch {
-    alert("Unable to save app data. Attached files may be too large for browser storage.");
+    if (showAlert) {
+      alert("Unable to save app data. Attached files are too large for browser storage.");
+    }
+    return false;
   }
 }
 
@@ -1770,9 +2002,12 @@ function getLeaseMonths(leaseStart, leaseEnd) {
   return months;
 }
 
-function readFilesAsDocuments(fileList) {
+async function readFilesAsDocuments(fileList, options = {}) {
   const files = Array.from(fileList || []);
-  if (!files.length) return Promise.resolve([]);
+  if (!files.length) return [];
+  if (remoteEnabled && supabaseClient) {
+    return uploadFilesToSupabaseStorage(files, options.tenantId || crypto.randomUUID());
+  }
   return Promise.all(
     files.map((file) =>
       fileToDataUrl(file).then((dataUrl) => ({
@@ -1793,13 +2028,102 @@ function fileToDataUrl(file) {
   });
 }
 
+async function uploadFilesToSupabaseStorage(files, tenantId) {
+  if (!supabaseClient) {
+    throw new Error("Supabase client is not initialized.");
+  }
+  const storage = supabaseClient.storage.from(supabaseDocBucket);
+  const uploaded = [];
+
+  for (const file of files) {
+    const safeName = sanitizeFileName(file.name || "document");
+    const path = `${sharedStateRowId}/${tenantId}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+    const { error } = await storage.upload(path, file, {
+      upsert: false,
+      cacheControl: "3600",
+      contentType: file.type || "application/octet-stream"
+    });
+    if (error) {
+      throw new Error(
+        `Failed to upload "${file.name}". Ensure Supabase Storage bucket "${supabaseDocBucket}" exists and is writable.`
+      );
+    }
+    const { data } = storage.getPublicUrl(path);
+    uploaded.push({
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      path,
+      url: data?.publicUrl || ""
+    });
+  }
+  return uploaded;
+}
+
+function sanitizeFileName(name) {
+  return String(name || "file")
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+async function deleteRemoteDocuments(documents) {
+  if (!remoteEnabled || !supabaseClient) return;
+  const paths = (Array.isArray(documents) ? documents : [])
+    .map((doc) => String(doc?.path || "").trim())
+    .filter(Boolean);
+  if (!paths.length) return;
+  await supabaseClient.storage.from(supabaseDocBucket).remove(paths);
+}
+
+function validateLocalDocumentUpload(fileList) {
+  if (remoteEnabled) return { ok: true, message: "" };
+  const files = Array.from(fileList || []);
+  if (!files.length) return { ok: true, message: "" };
+
+  const oversized = files.find((file) => Number(file.size || 0) > LOCAL_DOC_SINGLE_FILE_LIMIT_BYTES);
+  if (oversized) {
+    return {
+      ok: false,
+      message: `File "${oversized.name}" is too large for local mode. Keep each file below ${Math.round(
+        LOCAL_DOC_SINGLE_FILE_LIMIT_BYTES / 1024
+      )} KB.`
+    };
+  }
+
+  const newBytes = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+  const existingBytes = getStoredDocumentApproxBytes();
+  if (existingBytes + newBytes > LOCAL_DOC_TOTAL_LIMIT_BYTES) {
+    return {
+      ok: false,
+      message:
+        "Attached documents exceed local browser storage capacity. Use smaller files or enable Supabase storage/realtime."
+    };
+  }
+
+  return { ok: true, message: "" };
+}
+
+function getStoredDocumentApproxBytes() {
+  return state.tenants.reduce((sum, tenant) => {
+    const docs = Array.isArray(tenant.documents) ? tenant.documents : [];
+    return (
+      sum +
+      docs.reduce((docSum, doc) => {
+        const dataUrl = String(doc?.dataUrl || "");
+        if (!dataUrl) return docSum;
+        return docSum + Math.floor(dataUrl.length * 0.75);
+      }, 0)
+    );
+  }, 0);
+}
+
 function renderDocumentLinks(documents) {
   if (!Array.isArray(documents) || !documents.length) return "-";
   return documents
-    .map(
-      (doc) =>
-        `<a class="doc-link" href="${doc.dataUrl}" download="${escapeHtml(doc.name)}">${escapeHtml(doc.name)}</a>`
-    )
+    .map((doc) => {
+      const href = String(doc?.url || doc?.dataUrl || "").trim();
+      if (!href) return escapeHtml(doc?.name || "Document");
+      return `<a class="doc-link" href="${href}" download="${escapeHtml(doc?.name || "document")}" target="_blank" rel="noopener noreferrer">${escapeHtml(doc?.name || "Document")}</a>`;
+    })
     .join("");
 }
 
@@ -1822,6 +2146,7 @@ function startEditTenant(tenantId) {
   if (!tenant) return;
 
   editingTenantId = tenant.id;
+  editDocKeysToDelete = new Set();
   editPropertyNameSelectEl.value = tenant.linkedUnitId || "";
   document.getElementById("editTenantName").value = tenant.tenantName;
   document.getElementById("editTenantEmail").value = tenant.email || "";
@@ -1833,6 +2158,7 @@ function startEditTenant(tenantId) {
   document.getElementById("editTenantDocuments").value = "";
   document.getElementById("replaceDocuments").checked = false;
   document.getElementById("editTenantNotes").value = tenant.notes || "";
+  renderEditExistingDocuments(tenant);
 
   activeTenantEditCardEl.classList.remove("hidden");
   activeTenantEditCardEl.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1875,12 +2201,33 @@ async function onEditTenant(event) {
   const files = document.getElementById("editTenantDocuments").files;
   const shouldReplaceDocs = document.getElementById("replaceDocuments").checked;
   let newDocs = [];
+  const localDocCheck = validateLocalDocumentUpload(files);
+  if (!localDocCheck.ok) {
+    alert(localDocCheck.message);
+    return;
+  }
 
   try {
-    newDocs = await readFilesAsDocuments(files);
-  } catch {
-    alert("Failed to read one or more attached documents.");
+    newDocs = await readFilesAsDocuments(files, { tenantId: tenant.id });
+  } catch (error) {
+    const message = String(error?.message || "");
+    if (message) {
+      alert(message);
+    } else {
+      alert("Failed to store one or more attached documents.");
+    }
     return;
+  }
+
+  const existingDocs = Array.isArray(tenant.documents) ? tenant.documents : [];
+  const docsToDelete = shouldReplaceDocs
+    ? existingDocs
+    : existingDocs.filter((doc) => editDocKeysToDelete.has(getDocumentKey(doc)));
+  const retainedDocs = shouldReplaceDocs
+    ? []
+    : existingDocs.filter((doc) => !editDocKeysToDelete.has(getDocumentKey(doc)));
+  if (docsToDelete.length) {
+    deleteRemoteDocuments(docsToDelete).catch(() => {});
   }
 
   tenant.linkedUnitId = linkedUnitId;
@@ -1893,7 +2240,7 @@ async function onEditTenant(event) {
   tenant.notes = document.getElementById("editTenantNotes").value.trim();
   tenant.leaseStart = leaseStart;
   tenant.leaseEnd = leaseEnd;
-  tenant.documents = shouldReplaceDocs ? newDocs : [...(tenant.documents || []), ...newDocs];
+  tenant.documents = [...retainedDocs, ...newDocs];
   syncUnitFromTenant(tenant, previousLinkedUnitId);
 
   saveState();
@@ -1903,8 +2250,61 @@ async function onEditTenant(event) {
 
 function cancelEditTenant() {
   editingTenantId = "";
+  editDocKeysToDelete = new Set();
   activeTenantEditFormEl.reset();
+  if (editExistingDocsEl) editExistingDocsEl.innerHTML = "";
   activeTenantEditCardEl.classList.add("hidden");
+}
+
+function getDocumentKey(doc) {
+  return String(doc?.path || doc?.url || doc?.dataUrl || doc?.name || "");
+}
+
+function onEditExistingDocAction(event) {
+  const deleteBtn = event.target.closest(".delete-existing-doc");
+  if (!deleteBtn || !editingTenantId) return;
+  const key = String(deleteBtn.dataset.docKey || "");
+  if (!key) return;
+  if (editDocKeysToDelete.has(key)) {
+    editDocKeysToDelete.delete(key);
+  } else {
+    editDocKeysToDelete.add(key);
+  }
+  const tenant = state.tenants.find((entry) => entry.id === editingTenantId);
+  if (tenant) renderEditExistingDocuments(tenant);
+}
+
+function renderEditExistingDocuments(tenant) {
+  if (!editExistingDocsEl) return;
+  const docs = Array.isArray(tenant?.documents) ? tenant.documents : [];
+  if (!docs.length) {
+    editExistingDocsEl.innerHTML = '<div class="existing-docs-empty">Existing Documents: none</div>';
+    return;
+  }
+
+  const items = docs
+    .map((doc) => {
+      const key = getDocumentKey(doc);
+      const marked = editDocKeysToDelete.has(key);
+      const href = String(doc?.url || doc?.dataUrl || "").trim();
+      const linkHtml = href
+        ? `<a class="doc-link" href="${href}" download="${escapeHtml(doc?.name || "document")}" target="_blank" rel="noopener noreferrer">${escapeHtml(doc?.name || "Document")}</a>`
+        : `<span>${escapeHtml(doc?.name || "Document")}</span>`;
+      const btnLabel = marked ? "Undo Delete" : "Delete";
+      return `
+        <div class="existing-doc-item ${marked ? "marked-delete" : ""}">
+          <div>${linkHtml}</div>
+          <button type="button" class="btn btn-small btn-danger delete-existing-doc" data-doc-key="${escapeHtml(key)}">${btnLabel}</button>
+        </div>
+      `;
+    })
+    .join("");
+
+  editExistingDocsEl.innerHTML = `
+    <div class="existing-docs-title">Existing Documents</div>
+    <div class="existing-docs-note">Click Delete and Save to remove a file.</div>
+    ${items}
+  `;
 }
 
 function initEditorAccess() {
@@ -2072,6 +2472,13 @@ function getTenantUnitNumber(tenant) {
     const linkedUnit = state.units.find((unit) => unit.id === tenant.linkedUnitId);
     if (linkedUnit?.unitNumber) return linkedUnit.unitNumber;
   }
+  const matchedByName = state.units.find((unit) => {
+    if (unit.status !== "occupied") return false;
+    const unitTenant = String(unit.tenantName || "").trim().toLowerCase();
+    const targetTenant = String(tenant?.tenantName || "").trim().toLowerCase();
+    return unitTenant && targetTenant && unitTenant === targetTenant;
+  });
+  if (matchedByName?.unitNumber) return matchedByName.unitNumber;
   const property = String(getTenantPropertyName(tenant) || "");
   const idx = property.indexOf(" - ");
   if (idx >= 0 && idx + 3 < property.length) {
@@ -2085,10 +2492,31 @@ function getTenantBuildingName(tenant) {
     const unit = state.units.find((entry) => entry.id === tenant.linkedUnitId);
     if (unit?.buildingName) return unit.buildingName;
   }
+  const matchedByName = state.units.find((unit) => {
+    if (unit.status !== "occupied") return false;
+    const unitTenant = String(unit.tenantName || "").trim().toLowerCase();
+    const targetTenant = String(tenant?.tenantName || "").trim().toLowerCase();
+    return unitTenant && targetTenant && unitTenant === targetTenant;
+  });
+  if (matchedByName?.buildingName) return matchedByName.buildingName;
   const fallback = String(tenant.propertyName || "").trim();
   if (!fallback) return "Unknown";
   const idx = fallback.indexOf(" - ");
   return idx > 0 ? fallback.slice(0, idx).trim() : fallback;
+}
+
+function getBuildingAddress(buildingName) {
+  const key = normalizeUnitText(buildingName);
+  if (!key) return "";
+  const addresses = state.notifyConfig.buildingAddresses || {};
+  return String(addresses[key] || "").trim();
+}
+
+function getBuildingLandlord(buildingName) {
+  const key = normalizeUnitText(buildingName);
+  if (!key) return "";
+  const landlords = state.notifyConfig.buildingLandlords || {};
+  return String(landlords[key] || "").trim();
 }
 
 function getUnitOptionsHtml() {
@@ -2160,7 +2588,9 @@ function normalizeNotifyConfig(config) {
       emailjsServiceId: "",
       emailjsTemplateId: "",
       senderName: "Rental Management",
-      reviewSubjectTemplate: "Payment Review Required: {unit} {tenant name}"
+      reviewSubjectTemplate: "Payment Review Required: {unit} {tenant name}",
+      buildingAddresses: {},
+      buildingLandlords: {}
     };
   }
   return {
@@ -2170,8 +2600,114 @@ function normalizeNotifyConfig(config) {
     emailjsServiceId: config.emailjsServiceId || "",
     emailjsTemplateId: config.emailjsTemplateId || "",
     senderName: config.senderName || "Rental Management",
-    reviewSubjectTemplate: config.reviewSubjectTemplate || "Payment Review Required: {unit} {tenant name}"
+    reviewSubjectTemplate: config.reviewSubjectTemplate || "Payment Review Required: {unit} {tenant name}",
+    buildingAddresses: normalizeBuildingAddresses(config.buildingAddresses),
+    buildingLandlords: normalizeBuildingLandlords(config.buildingLandlords)
   };
+}
+
+function normalizeBuildingAddresses(addresses) {
+  if (!addresses || typeof addresses !== "object") return {};
+  const normalized = {};
+  Object.entries(addresses).forEach(([building, address]) => {
+    const name = normalizeUnitText(building);
+    const value = String(address || "").trim();
+    if (!name || !value) return;
+    normalized[name] = value;
+  });
+  return normalized;
+}
+
+function normalizeBuildingLandlords(landlords) {
+  if (!landlords || typeof landlords !== "object") return {};
+  const normalized = {};
+  Object.entries(landlords).forEach(([building, landlord]) => {
+    const name = normalizeUnitText(building);
+    const value = String(landlord || "").trim();
+    if (!name || !value) return;
+    normalized[name] = value;
+  });
+  return normalized;
+}
+
+function getKnownBuildingNames() {
+  return [
+    ...new Set(
+      state.units
+        .map((unit) => normalizeUnitText(unit.buildingName))
+        .filter(Boolean)
+        .concat(state.tenants.map((tenant) => normalizeUnitText(getTenantBuildingName(tenant))).filter(Boolean))
+    )
+  ].sort((a, b) => a.localeCompare(b));
+}
+
+function renderBuildingAddressFields() {
+  if (!buildingAddressFieldsEl) return;
+  const buildings = getKnownBuildingNames();
+  const addressMap = state.notifyConfig.buildingAddresses || {};
+  const landlordMap = state.notifyConfig.buildingLandlords || {};
+  if (!buildings.length) {
+    buildingAddressFieldsEl.innerHTML = '<div class="empty-note">No buildings found yet. Add units to configure addresses.</div>';
+    return;
+  }
+
+  buildingAddressFieldsEl.innerHTML = "";
+  buildings.forEach((building) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "building-setting-group";
+
+    const landlordLabel = document.createElement("label");
+    landlordLabel.textContent = `${building} Landlord Name`;
+    const landlordInput = document.createElement("input");
+    landlordInput.type = "text";
+    landlordInput.placeholder = `Enter landlord name for ${building}`;
+    landlordInput.dataset.buildingLandlord = building;
+    landlordInput.value = landlordMap[building] || "";
+    landlordLabel.appendChild(landlordInput);
+
+    const addressLabel = document.createElement("label");
+    addressLabel.textContent = `${building} Address`;
+    const textarea = document.createElement("textarea");
+    textarea.rows = 2;
+    textarea.placeholder = `Enter address for ${building}`;
+    textarea.dataset.buildingAddress = building;
+    textarea.value = addressMap[building] || "";
+    addressLabel.appendChild(textarea);
+
+    wrapper.appendChild(landlordLabel);
+    wrapper.appendChild(addressLabel);
+    buildingAddressFieldsEl.appendChild(wrapper);
+  });
+}
+
+function getBuildingAddressesFromSettings() {
+  const existing = { ...(state.notifyConfig.buildingAddresses || {}) };
+  if (!buildingAddressFieldsEl) return normalizeBuildingAddresses(existing);
+
+  buildingAddressFieldsEl.querySelectorAll("textarea[data-building-address]").forEach((textarea) => {
+    const building = normalizeUnitText(textarea.dataset.buildingAddress || "");
+    if (!building) return;
+    const value = String(textarea.value || "").trim();
+    if (value) existing[building] = value;
+    else delete existing[building];
+  });
+
+  return normalizeBuildingAddresses(existing);
+}
+
+function getBuildingLandlordsFromSettings() {
+  const existing = { ...(state.notifyConfig.buildingLandlords || {}) };
+  if (!buildingAddressFieldsEl) return normalizeBuildingLandlords(existing);
+
+  buildingAddressFieldsEl.querySelectorAll("input[data-building-landlord]").forEach((input) => {
+    const building = normalizeUnitText(input.dataset.buildingLandlord || "");
+    if (!building) return;
+    const value = String(input.value || "").trim();
+    if (value) existing[building] = value;
+    else delete existing[building];
+  });
+
+  return normalizeBuildingLandlords(existing);
 }
 
 function isEmailServiceConfigured() {
