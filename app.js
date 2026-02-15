@@ -801,6 +801,16 @@ function printRentalReceipt(tenant, monthKey) {
           .line-medium { min-width: 220px; }
           .line-small { min-width: 120px; }
           .sign-row { margin-top: 34px; }
+          @media (max-width: 640px) {
+            body { padding: 12px; }
+            .receipt { max-width: 100%; padding: 14px; }
+            h1 { font-size: 24px; letter-spacing: 0.04em; }
+            p { font-size: 15px; line-height: 1.45; }
+            .line { min-width: 40px; }
+            .line-wide { min-width: 0; display: inline; }
+            .line-medium { min-width: 0; display: inline; }
+            .line-small { min-width: 0; display: inline; }
+          }
         </style>
       </head>
       <body>
