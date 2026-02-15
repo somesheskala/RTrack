@@ -1,0 +1,9 @@
+{
+  "appId": "com.veeramma.rtrack",
+  "appName": "RTrack",
+  "webDir": "mobile-web",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

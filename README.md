@@ -2,11 +2,16 @@
 
 This app is a static frontend (`index.html`, `app.js`, `styles.css`) with optional shared realtime data using Supabase.
 
+## Production URL
+
+- https://veeramma-residency.netlify.app/
+
 ## 1. Quick Architecture
 
 - Frontend hosting: Netlify (or any static host)
 - Shared data store: Supabase table `public.app_state`
 - Realtime sync: Supabase `postgres_changes` subscription in `app.js`
+- Tenant documents: Supabase Storage bucket (`tenant-documents`)
 - Email notifications: EmailJS API
 
 Important:
@@ -41,11 +46,20 @@ Edit `config.js`:
 window.APP_CONFIG = {
   SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
   SUPABASE_ANON_KEY: "YOUR_ANON_PUBLIC_KEY",
-  SHARED_STATE_ROW_ID: "shared"
+  SHARED_STATE_ROW_ID: "shared",
+  SUPABASE_STORAGE_BUCKET: "tenant-documents"
 };
 ```
 
 Keep `SHARED_STATE_ROW_ID` stable (for example `shared`) so existing data is reused.
+
+### Step 5: Create Storage bucket for tenant documents
+1. Supabase -> `Storage` -> `Create bucket`
+2. Bucket name: `tenant-documents`
+3. Set as `Public` (or configure signed URLs if using private bucket later)
+4. Save
+
+Without storage bucket, tenant PDF/document upload will fail.
 
 ---
 
@@ -198,3 +212,6 @@ git push -u origin fix/<short-name>
 - `config.js` - runtime config (Supabase values)
 - `supabase-setup.sql` - DB setup script
 - `SUPABASE_SETUP.md` - short Supabase notes
+- `MOBILE_APP_SETUP.md` - Android/iOS wrapper setup using Capacitor
+- `capacitor.config.json` - Capacitor app configuration
+- `scripts/prepare-mobile-web.sh` - prepares mobile web bundle

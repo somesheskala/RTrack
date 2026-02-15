@@ -1,5 +1,9 @@
 # RTrack Quickstart
 
+## Production URL
+
+- https://veeramma-residency.netlify.app/
+
 ## 1) One-Time Setup
 
 1. Configure Supabase in `config.js`:
@@ -7,13 +11,16 @@
 window.APP_CONFIG = {
   SUPABASE_URL: "https://YOUR_PROJECT.supabase.co",
   SUPABASE_ANON_KEY: "YOUR_ANON_PUBLIC_KEY",
-  SHARED_STATE_ROW_ID: "shared"
+  SHARED_STATE_ROW_ID: "shared",
+  SUPABASE_STORAGE_BUCKET: "tenant-documents"
 };
 ```
 
 2. Run `supabase-setup.sql` once in Supabase SQL Editor.
 
-3. Deploy to Netlify from GitHub repo (`somesheskala/RTrack`).
+3. In Supabase Storage, create public bucket: `tenant-documents`.
+
+4. Deploy to Netlify from GitHub repo (`somesheskala/RTrack`).
 
 ---
 
@@ -85,3 +92,26 @@ Check SUPABASE_URL, SUPABASE_ANON_KEY, and SQL setup.
 ```text
 Check EmailJS Public Key, Service ID, Template ID in Settings.
 ```
+
+---
+
+## 7) Mobile App Quickstart (Android/iOS)
+
+Use the same web app UI as a native mobile app wrapper.
+
+```bash
+cd "/Users/se066192/Documents/New project"
+npm install
+npx cap add android
+npx cap add ios
+npm run mobile:android
+npm run mobile:ios
+```
+
+After any web code change:
+
+```bash
+npm run mobile:sync
+```
+
+Full guide: `MOBILE_APP_SETUP.md`
