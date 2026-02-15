@@ -177,6 +177,7 @@ const editorPinEl = document.getElementById("editorPin");
 const editorLoginBtnEl = document.getElementById("editorLoginBtn");
 const editorLogoutEl = document.getElementById("editorLogout");
 const editorStatusEl = document.getElementById("editorStatus");
+const manualRefreshBtnEl = document.getElementById("manualRefreshBtn");
 let editingTenantId = "";
 let editingUnitId = "";
 let editDocKeysToDelete = new Set();
@@ -2412,7 +2413,30 @@ function initEditorAccess() {
     });
   }
   editorLogoutEl.addEventListener("click", onEditorLogout);
+  if (manualRefreshBtnEl) {
+    manualRefreshBtnEl.addEventListener("click", onManualRefresh);
+  }
   updateEditorStatusUi();
+}
+
+async function onManualRefresh() {
+  if (manualRefreshBtnEl) manualRefreshBtnEl.disabled = true;
+  try {
+    if (remoteEnabled) {
+      const loaded = await loadRemoteState();
+      if (!loaded) {
+        alert("Could not fetch latest server data right now.");
+      }
+    } else {
+      loadLocalState();
+    }
+    activeMonthInput.value = state.activeMonth;
+    renderAll();
+  } catch {
+    alert("Refresh failed. Please try again.");
+  } finally {
+    if (manualRefreshBtnEl) manualRefreshBtnEl.disabled = false;
+  }
 }
 
 function onEditorLogin(event) {

@@ -91,6 +91,10 @@ body {
   display: none;
 }
 
+.editor-always {
+  display: inline-flex;
+}
+
 .editor-access.authenticated .editor-login-only {
   display: none;
 }
