@@ -9,6 +9,89 @@
   --paid: #1f7a46;
   --due: #b64033;
   --review: #db7a12;
+  --bg-glow-1: rgba(255, 255, 255, 0.62);
+  --bg-glow-2: rgba(232, 214, 189, 0.56);
+  --bg-grad-start: #f9f3ea;
+  --bg-grad-mid: #efe3d2;
+  --bg-grad-end: #e8d8bf;
+  --tab-grad-start: #7b7369;
+  --tab-grad-end: #635b53;
+  --tab-active-start: #4b433b;
+  --tab-active-end: #352f29;
+  --btn-grad-start: #7b7369;
+  --btn-grad-end: #635b53;
+}
+
+:root[data-theme="sandstone"] {
+  --bg: #efe2d0;
+  --panel: rgba(255, 248, 239, 0.5);
+  --ink: #221a14;
+  --muted: #635345;
+  --bg-glow-1: rgba(255, 255, 255, 0.58);
+  --bg-glow-2: rgba(224, 193, 161, 0.5);
+  --bg-grad-start: #f8efe2;
+  --bg-grad-mid: #ecd9be;
+  --bg-grad-end: #e0c5a2;
+  --tab-grad-start: #8a7159;
+  --tab-grad-end: #705845;
+  --tab-active-start: #5c4635;
+  --tab-active-end: #463526;
+  --btn-grad-start: #8a7159;
+  --btn-grad-end: #705845;
+}
+
+:root[data-theme="ocean-mist"] {
+  --bg: #dbe8ea;
+  --panel: rgba(239, 250, 252, 0.54);
+  --ink: #132229;
+  --muted: #435a65;
+  --bg-glow-1: rgba(255, 255, 255, 0.62);
+  --bg-glow-2: rgba(175, 212, 220, 0.5);
+  --bg-grad-start: #edf8fa;
+  --bg-grad-mid: #d8eaef;
+  --bg-grad-end: #bed9e0;
+  --tab-grad-start: #5f7f8b;
+  --tab-grad-end: #4b6771;
+  --tab-active-start: #3f5a63;
+  --tab-active-end: #2f464d;
+  --btn-grad-start: #5f7f8b;
+  --btn-grad-end: #4b6771;
+}
+
+:root[data-theme="forest-sage"] {
+  --bg: #dbe5d8;
+  --panel: rgba(245, 251, 241, 0.5);
+  --ink: #162119;
+  --muted: #485b49;
+  --bg-glow-1: rgba(255, 255, 255, 0.6);
+  --bg-glow-2: rgba(172, 197, 168, 0.5);
+  --bg-grad-start: #edf4ea;
+  --bg-grad-mid: #d9e7d2;
+  --bg-grad-end: #bfd2b4;
+  --tab-grad-start: #617a61;
+  --tab-grad-end: #4f654f;
+  --tab-active-start: #3f523f;
+  --tab-active-end: #334233;
+  --btn-grad-start: #617a61;
+  --btn-grad-end: #4f654f;
+}
+
+:root[data-theme="charcoal-gold"] {
+  --bg: #ddd2c0;
+  --panel: rgba(255, 248, 236, 0.48);
+  --ink: #18130e;
+  --muted: #5b5044;
+  --bg-glow-1: rgba(255, 255, 255, 0.52);
+  --bg-glow-2: rgba(210, 184, 137, 0.46);
+  --bg-grad-start: #f6efe3;
+  --bg-grad-mid: #e7dcc9;
+  --bg-grad-end: #d8c2a0;
+  --tab-grad-start: #6f6257;
+  --tab-grad-end: #5a4e45;
+  --tab-active-start: #3f3832;
+  --tab-active-end: #2f2a26;
+  --btn-grad-start: #6f6257;
+  --btn-grad-end: #5a4e45;
 }
 
 * {
@@ -20,9 +103,9 @@ body {
   font-family: "Space Grotesk", sans-serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at 8% 12%, rgba(255, 255, 255, 0.62) 0%, transparent 36%),
-    radial-gradient(circle at 88% 84%, rgba(232, 214, 189, 0.56) 0%, transparent 35%),
-    linear-gradient(150deg, #f9f3ea 0%, #efe3d2 56%, #e8d8bf 100%),
+    radial-gradient(circle at 8% 12%, var(--bg-glow-1) 0%, transparent 36%),
+    radial-gradient(circle at 88% 84%, var(--bg-glow-2) 0%, transparent 35%),
+    linear-gradient(150deg, var(--bg-grad-start) 0%, var(--bg-grad-mid) 56%, var(--bg-grad-end) 100%),
     var(--bg);
   min-height: 100vh;
 }
@@ -166,7 +249,7 @@ body {
 
 .tab-btn {
   border: 1px solid rgba(255, 255, 255, 0.55);
-  background: linear-gradient(180deg, #7b7369 0%, #635b53 100%);
+  background: linear-gradient(180deg, var(--tab-grad-start) 0%, var(--tab-grad-end) 100%);
   color: rgba(255, 255, 255, 0.86);
   border-radius: 999px;
   padding: 0.58rem 1rem;
@@ -191,7 +274,7 @@ body {
 }
 
 .tab-btn.active {
-  background: linear-gradient(180deg, #4b433b 0%, #352f29 100%);
+  background: linear-gradient(180deg, var(--tab-active-start) 0%, var(--tab-active-end) 100%);
   color: #fff;
   border-color: rgba(20, 15, 11, 0.75);
   font-weight: 700;
@@ -286,7 +369,7 @@ textarea:focus {
   padding: 0.68rem 0.95rem;
   font: inherit;
   font-weight: 600;
-  background: linear-gradient(180deg, #7b7369 0%, #635b53 100%);
+  background: linear-gradient(180deg, var(--btn-grad-start) 0%, var(--btn-grad-end) 100%);
   color: #fff;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(18, 14, 10, 0.24);
@@ -305,7 +388,7 @@ textarea:focus {
 }
 
 .btn-muted {
-  background: linear-gradient(180deg, #7b7369 0%, #635b53 100%);
+  background: linear-gradient(180deg, var(--btn-grad-start) 0%, var(--btn-grad-end) 100%);
 }
 
 .btn-muted:hover {
@@ -342,17 +425,6 @@ textarea:focus {
   justify-content: flex-end;
 }
 
-.icon-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.36rem;
-}
-
-.printer-icon {
-  font-size: 0.92rem;
-  line-height: 1;
-}
-
 .month-control label {
   margin: 0;
   color: var(--muted);
@@ -383,10 +455,11 @@ textarea:focus {
 }
 
 .tenant-card {
+  position: relative;
   border: 1px solid rgba(79, 59, 42, 0.14);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.54);
-  padding: 0.68rem;
+  padding: 0.84rem 0.68rem 0.68rem;
   box-shadow: 0 4px 10px rgba(39, 29, 21, 0.06);
 }
 
@@ -798,15 +871,22 @@ textarea:focus {
 }
 
 .unit-header-badge {
-  display: inline-block;
-  padding: 0.12rem 0.4rem;
-  border: 1px solid rgba(73, 55, 40, 0.3);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.62);
+  position: absolute;
+  top: -0.48rem;
+  left: 25%;
+  z-index: 2;
+  display: inline;
+  padding: 0 0.2rem;
+  border: none;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.54);
   color: #241c16;
-  font-size: 0.76rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
   text-align: left;
+  box-shadow: none;
+  transform: translateX(-50%);
 }
 
 .unit-card .tenant-card-head > div:first-child,
@@ -863,6 +943,14 @@ textarea:focus {
   font-weight: 700;
   color: #2f241b;
   text-align: left;
+}
+
+.tenant-name-row {
+  margin-top: 0.34rem;
+  margin-bottom: 0.18rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #2f241b;
 }
 
 .payment-lease-center {
@@ -953,40 +1041,108 @@ textarea:focus {
 }
 
 .active-tenant-card .tenant-card-head {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0.34rem;
-  align-items: start;
+  grid-template-columns: 1fr;
+  gap: 0.2rem;
+  align-items: center;
+  margin-bottom: 0.2rem;
 }
 
 .active-tenant-card .tenant-card-right {
+  display: none;
+}
+
+.active-head-unit {
+  display: flex;
+  justify-content: center;
+}
+
+.active-tenant-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5.8rem;
+  gap: 0.26rem 0.44rem;
+  align-items: start;
+}
+
+.active-cell {
   min-width: 0;
-  justify-items: end;
 }
 
-.active-tenant-card .actions {
-  flex-wrap: wrap;
-  max-width: 100%;
-  justify-content: flex-end;
-  gap: 0.28rem;
-}
-
-.active-tenant-card .btn-small {
-  padding: 0.29rem 0.44rem;
-  font-size: 0.69rem;
-}
-
-.active-tenant-card .tenant-card-grid {
-  margin-top: 0.28rem;
-  gap: 0.24rem 0.5rem;
-}
-
-.active-tenant-card .tenant-card-grid span {
-  font-size: 0.7rem;
+.active-cell span {
+  display: block;
+  font-size: 0.68rem;
   color: #5b4a3d;
 }
 
-.active-tenant-card .tenant-card-grid strong {
-  font-size: 0.8rem;
+.active-cell strong {
+  display: block;
+  margin-top: 0.08rem;
+  font-size: 0.78rem;
+  color: #1e1814;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.active-cell-right {
+  text-align: right;
+}
+
+.active-action-slot {
+  min-height: 2rem;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.active-action-slot .btn-small {
+  min-width: 5.1rem;
+}
+
+@media (max-width: 980px) {
+  .site-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 5rem);
+  }
+
+  .editor-access {
+    top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+    left: 0.7rem;
+    right: 0.7rem;
+    justify-content: flex-end;
+    max-width: calc(100vw - 1.4rem);
+  }
+
+  .brand-subtitle {
+    left: 1rem;
+  }
+
+  .btn-small {
+    min-height: 2.5rem;
+    padding: 0.58rem 0.78rem;
+    font-size: 0.84rem;
+  }
+
+  .active-tenant-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 5.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .active-tenant-grid {
+    grid-template-columns: 1fr;
+    gap: 0.32rem;
+  }
+
+  .active-action-slot {
+    justify-content: flex-start;
+    min-height: 0;
+  }
+
+  .active-action-slot:empty {
+    display: none;
+  }
+
+  .active-action-slot .btn-small {
+    min-width: 4.4rem;
+  }
 }
 
 .lease-status-card {
@@ -1151,6 +1307,21 @@ textarea:focus {
 }
 
 .building-setting-group {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(85, 68, 50, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.access-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.8rem;
+}
+
+.access-group {
   display: grid;
   gap: 0.55rem;
   padding: 0.7rem;

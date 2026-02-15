@@ -81,17 +81,37 @@ const REMOTE_FALLBACK_WARNED_KEY = "rental-manager-remote-fallback-warned";
 const LOCAL_DOC_TOTAL_LIMIT_BYTES = 3 * 1024 * 1024;
 const LOCAL_DOC_SINGLE_FILE_LIMIT_BYTES = 700 * 1024;
 const DEFAULT_SUPABASE_DOC_BUCKET = "tenant-documents";
+const DEFAULT_UI_THEME = "beige-black";
+const UI_THEMES = ["beige-black", "sandstone", "ocean-mist", "forest-sage", "charcoal-gold"];
 const EDIT_USERS = [
-  { username: "viewer", pin: "1111", role: "viewer" },
-  { username: "manager", pin: "2222", role: "manager" },
-  { username: "admin", pin: "3333", role: "admin" }
+  { username: "viewer", role: "viewer" },
+  { username: "manager", role: "manager" },
+  { username: "admin", role: "admin" }
 ];
-const PIN_TO_USER = { "1111": "viewer", "2222": "manager", "3333": "admin" };
 
 const state = {
   activeMonth: getCurrentMonth(),
   tenants: [],
   units: [],
+  accessPins: {
+    viewer: "1111",
+    manager: "2222",
+    admin: "3333"
+  },
+  accessControl: {
+    manager: {
+      tabs: {
+        availableUnits: true,
+        activeTenants: true,
+        leaseStatus: true
+      },
+      cards: {
+        tenantEdit: false,
+        tenantAdd: false
+      }
+    }
+  },
+  uiTheme: DEFAULT_UI_THEME,
   notifyConfig: {
     admins: [],
     managers: [],
@@ -159,6 +179,28 @@ const cancelPropertyAddressBtnEl = document.getElementById("cancelPropertyAddres
 const editMailConfigBtnEl = document.getElementById("editMailConfigBtn");
 const saveMailConfigBtnEl = document.getElementById("saveMailConfigBtn");
 const cancelMailConfigBtnEl = document.getElementById("cancelMailConfigBtn");
+const accessControlSectionEl = document.getElementById("accessControlSection");
+const editAccessControlBtnEl = document.getElementById("editAccessControlBtn");
+const saveAccessControlBtnEl = document.getElementById("saveAccessControlBtn");
+const cancelAccessControlBtnEl = document.getElementById("cancelAccessControlBtn");
+const managerTabAvailableUnitsEl = document.getElementById("managerTabAvailableUnits");
+const managerTabActiveTenantsEl = document.getElementById("managerTabActiveTenants");
+const managerTabLeaseStatusEl = document.getElementById("managerTabLeaseStatus");
+const managerAccessTenantEditEl = document.getElementById("managerAccessTenantEdit");
+const managerAccessTenantAddEl = document.getElementById("managerAccessTenantAdd");
+const accessPinsSectionEl = document.getElementById("accessPinsSection");
+const editAccessPinsBtnEl = document.getElementById("editAccessPinsBtn");
+const saveAccessPinsBtnEl = document.getElementById("saveAccessPinsBtn");
+const cancelAccessPinsBtnEl = document.getElementById("cancelAccessPinsBtn");
+const viewerPinSettingEl = document.getElementById("viewerPinSetting");
+const managerPinSettingEl = document.getElementById("managerPinSetting");
+const adminPinSettingEl = document.getElementById("adminPinSetting");
+const showAccessPinsToggleEl = document.getElementById("showAccessPinsToggle");
+const themeSectionEl = document.getElementById("themeSection");
+const editThemeBtnEl = document.getElementById("editThemeBtn");
+const saveThemeBtnEl = document.getElementById("saveThemeBtn");
+const cancelThemeBtnEl = document.getElementById("cancelThemeBtn");
+const appThemeSelectEl = document.getElementById("appThemeSelect");
 const exportMonthlyReportBtnEl = document.getElementById("exportMonthlyReport");
 const tenantForm = document.getElementById("tenant-form");
 const activeMonthInput = document.getElementById("activeMonth");
@@ -188,7 +230,10 @@ let sharedStateRowId = "shared";
 let supabaseDocBucket = DEFAULT_SUPABASE_DOC_BUCKET;
 const settingsEditMode = {
   propertyAddress: false,
-  mailConfig: false
+  mailConfig: false,
+  accessControl: false,
+  accessPins: false,
+  theme: false
 };
 
 init();
@@ -271,6 +316,45 @@ async function init() {
   }
   if (saveMailConfigBtnEl) {
     saveMailConfigBtnEl.addEventListener("click", saveMailConfig);
+  }
+  if (editAccessControlBtnEl) {
+    editAccessControlBtnEl.addEventListener("click", () => setSettingsSectionMode("accessControl", true));
+  }
+  if (cancelAccessControlBtnEl) {
+    cancelAccessControlBtnEl.addEventListener("click", () => {
+      setSettingsSectionMode("accessControl", false);
+      renderNotifyConfig();
+    });
+  }
+  if (saveAccessControlBtnEl) {
+    saveAccessControlBtnEl.addEventListener("click", saveAccessControlConfig);
+  }
+  if (editAccessPinsBtnEl) {
+    editAccessPinsBtnEl.addEventListener("click", () => setSettingsSectionMode("accessPins", true));
+  }
+  if (cancelAccessPinsBtnEl) {
+    cancelAccessPinsBtnEl.addEventListener("click", () => {
+      setSettingsSectionMode("accessPins", false);
+      renderNotifyConfig();
+    });
+  }
+  if (saveAccessPinsBtnEl) {
+    saveAccessPinsBtnEl.addEventListener("click", saveAccessPinsConfig);
+  }
+  if (showAccessPinsToggleEl) {
+    showAccessPinsToggleEl.addEventListener("change", applyAccessPinsVisibility);
+  }
+  if (editThemeBtnEl) {
+    editThemeBtnEl.addEventListener("click", () => setSettingsSectionMode("theme", true));
+  }
+  if (cancelThemeBtnEl) {
+    cancelThemeBtnEl.addEventListener("click", () => {
+      setSettingsSectionMode("theme", false);
+      renderNotifyConfig();
+    });
+  }
+  if (saveThemeBtnEl) {
+    saveThemeBtnEl.addEventListener("click", saveThemeConfig);
   }
   if (exportMonthlyReportBtnEl) {
     exportMonthlyReportBtnEl.addEventListener("click", exportMonthlyReportPdf);
@@ -375,6 +459,7 @@ async function onAddTenant(event) {
 }
 
 function renderAll() {
+  applyAppTheme();
   syncDashboardPaymentsVisibility();
   renderMetrics();
   try {
@@ -485,7 +570,6 @@ function renderActiveTenantsToday() {
           const deleteAction = canManageTenantsInActiveList
             ? `<button type="button" class="btn btn-small btn-danger delete-tenant" data-tenant-id="${tenant.id}">Delete</button>`
             : "";
-          const actionsContent = editAction || deleteAction ? `${editAction}${deleteAction}` : '<span>No actions</span>';
 
           const card = document.createElement("article");
           card.className = "tenant-card active-tenant-card";
@@ -494,26 +578,27 @@ function renderActiveTenantsToday() {
           }
           card.innerHTML = `
             <div class="tenant-card-head">
-              <div class="payment-head-left">
+              <div class="active-head-unit">
                 <strong class="unit-header-badge">${escapeHtml(getTenantPropertyName(tenant))}</strong>
-                <div class="payment-tenant-name">${escapeHtml(getTenantDisplayName(tenant))}</div>
-              </div>
-              <div class="payment-lease-center">
-                <span>Lease</span>
-                <strong>${formatDate(tenant.leaseStart)} to ${formatDate(tenant.leaseEnd)}</strong>
-              </div>
-              <div class="tenant-card-right">
-                <div class="actions">${actionsContent}</div>
               </div>
             </div>
-            <div class="tenant-card-grid">
-              <div><span>Email</span><strong>${tenant.email ? escapeHtml(tenant.email) : "-"}</strong></div>
-              <div><span>Mobile</span><strong>${tenant.mobile ? escapeHtml(tenant.mobile) : "-"}</strong></div>
-              <div><span>Rent</span><strong>${money(tenant.monthlyRent)}</strong></div>
-              <div><span>Deposit</span><strong>${money(tenant.deposit || 0)}</strong></div>
-              <div><span>Documents</span><strong>${renderDocumentLinks(tenant.documents)}</strong></div>
+            <div class="active-tenant-grid">
+              <div class="active-cell"><span>Name</span><strong>${escapeHtml(getTenantDisplayName(tenant))}</strong></div>
+              <div class="active-cell"><span>Lease</span><strong>${formatDate(tenant.leaseStart)} to ${formatDate(tenant.leaseEnd)}</strong></div>
+              <div class="active-action-slot"></div>
+
+              <div class="active-cell"><span>Email</span><strong>${tenant.email ? escapeHtml(tenant.email) : "-"}</strong></div>
+              <div class="active-cell"><span>Mobile</span><strong>${tenant.mobile ? escapeHtml(tenant.mobile) : "-"}</strong></div>
+              <div class="active-action-slot">${editAction || ""}</div>
+
+              <div class="active-cell"><span>Rent</span><strong>${money(tenant.monthlyRent)}</strong></div>
+              <div class="active-cell"><span>Deposit</span><strong>${money(tenant.deposit || 0)}</strong></div>
+              <div class="active-action-slot">${deleteAction || ""}</div>
+
+              <div class="active-cell"><span>Documents</span><strong>${renderDocumentLinks(tenant.documents)}</strong></div>
+              <div class="active-cell"><span>Notes</span><strong>${tenant.notes ? escapeHtml(tenant.notes) : "-"}</strong></div>
+              <div class="active-action-slot"></div>
             </div>
-            <div class="tenant-card-notes"><span>Notes:</span> ${tenant.notes ? escapeHtml(tenant.notes) : "-"}</div>
           `;
           list.appendChild(card);
         });
@@ -726,7 +811,7 @@ function renderRows() {
             const notifyBtn = document.createElement("button");
             notifyBtn.type = "button";
             notifyBtn.className = "btn btn-small";
-            notifyBtn.textContent = "Notify Payment";
+            notifyBtn.textContent = "Notify";
             notifyBtn.addEventListener("click", () => notifyTenant(tenant, safeMonth));
             actionsCell.appendChild(notifyBtn);
           }
@@ -735,7 +820,7 @@ function renderRows() {
             const receiptBtn = document.createElement("button");
             receiptBtn.type = "button";
             receiptBtn.className = "btn btn-small";
-            receiptBtn.textContent = "Print Receipt";
+            receiptBtn.textContent = "Print";
             receiptBtn.addEventListener("click", () => printRentalReceipt(tenant, safeMonth));
             actionsCell.appendChild(receiptBtn);
           }
@@ -1441,12 +1526,27 @@ function renderNotifyConfig() {
   reviewSubjectTemplateEl.value =
     state.notifyConfig.reviewSubjectTemplate || "Payment Review Required: {unit} {tenant name}";
   renderBuildingAddressFields();
+  renderAccessControlSettings();
+  renderAccessPinsSettings();
+  renderThemeSettings();
   setSettingsSectionMode("propertyAddress", settingsEditMode.propertyAddress);
   setSettingsSectionMode("mailConfig", settingsEditMode.mailConfig);
+  setSettingsSectionMode("accessControl", settingsEditMode.accessControl);
+  setSettingsSectionMode("accessPins", settingsEditMode.accessPins);
+  setSettingsSectionMode("theme", settingsEditMode.theme);
 }
 
 function setSettingsSectionMode(section, isEditing) {
-  const key = section === "mailConfig" ? "mailConfig" : "propertyAddress";
+  const key =
+    section === "mailConfig"
+      ? "mailConfig"
+      : section === "accessControl"
+        ? "accessControl"
+        : section === "accessPins"
+          ? "accessPins"
+          : section === "theme"
+            ? "theme"
+            : "propertyAddress";
   settingsEditMode[key] = Boolean(isEditing);
   const editing = settingsEditMode[key];
 
@@ -1462,6 +1562,25 @@ function setSettingsSectionMode(section, isEditing) {
       .querySelectorAll("input, textarea, select")
       .forEach((field) => (field.disabled = !editing));
     toggleSectionButtons(editMailConfigBtnEl, saveMailConfigBtnEl, cancelMailConfigBtnEl, editing);
+  }
+
+  if (key === "accessControl" && accessControlSectionEl) {
+    accessControlSectionEl
+      .querySelectorAll("input, textarea, select")
+      .forEach((field) => (field.disabled = !editing));
+    toggleSectionButtons(editAccessControlBtnEl, saveAccessControlBtnEl, cancelAccessControlBtnEl, editing);
+  }
+
+  if (key === "accessPins" && accessPinsSectionEl) {
+    accessPinsSectionEl
+      .querySelectorAll("input, textarea, select")
+      .forEach((field) => (field.disabled = !editing));
+    toggleSectionButtons(editAccessPinsBtnEl, saveAccessPinsBtnEl, cancelAccessPinsBtnEl, editing);
+  }
+
+  if (key === "theme" && themeSectionEl) {
+    themeSectionEl.querySelectorAll("input, textarea, select").forEach((field) => (field.disabled = !editing));
+    toggleSectionButtons(editThemeBtnEl, saveThemeBtnEl, cancelThemeBtnEl, editing);
   }
 }
 
@@ -1501,6 +1620,122 @@ function saveMailConfig() {
   setSettingsSectionMode("mailConfig", false);
   renderNotifyConfig();
   alert("Mail server configuration section saved.");
+}
+
+function renderAccessControlSettings() {
+  const managerTabs = state.accessControl?.manager?.tabs || {};
+  const managerCards = state.accessControl?.manager?.cards || {};
+  if (managerTabAvailableUnitsEl) managerTabAvailableUnitsEl.checked = Boolean(managerTabs.availableUnits);
+  if (managerTabActiveTenantsEl) managerTabActiveTenantsEl.checked = Boolean(managerTabs.activeTenants);
+  if (managerTabLeaseStatusEl) managerTabLeaseStatusEl.checked = Boolean(managerTabs.leaseStatus);
+  if (managerAccessTenantEditEl) managerAccessTenantEditEl.checked = Boolean(managerCards.tenantEdit);
+  if (managerAccessTenantAddEl) managerAccessTenantAddEl.checked = Boolean(managerCards.tenantAdd);
+}
+
+function saveAccessControlConfig() {
+  if (!hasPermission("manage_notify_lists")) {
+    alert("You do not have permission to manage access control.");
+    return;
+  }
+  state.accessControl = normalizeAccessControl({
+    manager: {
+      tabs: {
+        availableUnits: Boolean(managerTabAvailableUnitsEl?.checked),
+        activeTenants: Boolean(managerTabActiveTenantsEl?.checked),
+        leaseStatus: Boolean(managerTabLeaseStatusEl?.checked)
+      },
+      cards: {
+        tenantEdit: Boolean(managerAccessTenantEditEl?.checked),
+        tenantAdd: Boolean(managerAccessTenantAddEl?.checked)
+      }
+    }
+  });
+  saveState();
+  setSettingsSectionMode("accessControl", false);
+  renderAll();
+  alert("Access control section saved.");
+}
+
+function renderAccessPinsSettings() {
+  if (viewerPinSettingEl) viewerPinSettingEl.value = state.accessPins?.viewer || "";
+  if (managerPinSettingEl) managerPinSettingEl.value = state.accessPins?.manager || "";
+  if (adminPinSettingEl) adminPinSettingEl.value = state.accessPins?.admin || "";
+  if (showAccessPinsToggleEl) showAccessPinsToggleEl.checked = false;
+  applyAccessPinsVisibility();
+}
+
+function saveAccessPinsConfig() {
+  if (!hasPermission("manage_notify_lists")) {
+    alert("You do not have permission to manage access PINs.");
+    return;
+  }
+
+  const viewerPin = String(viewerPinSettingEl?.value || "").trim().replace(/\D/g, "");
+  const managerPin = String(managerPinSettingEl?.value || "").trim().replace(/\D/g, "");
+  const adminPin = String(adminPinSettingEl?.value || "").trim().replace(/\D/g, "");
+  const allPins = [viewerPin, managerPin, adminPin];
+
+  if (allPins.some((pin) => !/^\d{4,8}$/.test(pin))) {
+    alert("PIN must be numeric and 4 to 8 digits for all users.");
+    return;
+  }
+  if (new Set(allPins).size !== allPins.length) {
+    alert("Viewer, Manager, and Admin PINs must be different.");
+    return;
+  }
+
+  state.accessPins = normalizeAccessPins({
+    viewer: viewerPin,
+    manager: managerPin,
+    admin: adminPin
+  });
+  saveState();
+  setSettingsSectionMode("accessPins", false);
+  renderNotifyConfig();
+  alert("Access PINs updated.");
+}
+
+function applyAccessPinsVisibility() {
+  const show = Boolean(showAccessPinsToggleEl?.checked);
+  const type = show ? "text" : "password";
+  if (viewerPinSettingEl) viewerPinSettingEl.type = type;
+  if (managerPinSettingEl) managerPinSettingEl.type = type;
+  if (adminPinSettingEl) adminPinSettingEl.type = type;
+}
+
+function renderThemeSettings() {
+  if (!appThemeSelectEl) return;
+  appThemeSelectEl.value = normalizeTheme(state.uiTheme);
+}
+
+function saveThemeConfig() {
+  if (!hasPermission("manage_notify_lists")) {
+    alert("You do not have permission to manage themes.");
+    return;
+  }
+  state.uiTheme = normalizeTheme(appThemeSelectEl?.value);
+  applyAppTheme();
+  saveState();
+  setSettingsSectionMode("theme", false);
+  renderNotifyConfig();
+  alert("Theme updated.");
+}
+
+function applyAppTheme() {
+  const theme = normalizeTheme(state.uiTheme);
+  state.uiTheme = theme;
+  document.documentElement.setAttribute("data-theme", theme);
+  const themeColorMap = {
+    "beige-black": "#171411",
+    sandstone: "#5b4d3f",
+    "ocean-mist": "#2f4d5a",
+    "forest-sage": "#3d5844",
+    "charcoal-gold": "#2a2520"
+  };
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (metaThemeColor) {
+    metaThemeColor.setAttribute("content", themeColorMap[theme] || themeColorMap[DEFAULT_UI_THEME]);
+  }
 }
 
 function exportMonthlyReportPdf() {
@@ -1981,6 +2216,9 @@ function getSerializedState() {
     activeMonth: state.activeMonth,
     tenants: state.tenants,
     units: state.units,
+    accessPins: state.accessPins,
+    accessControl: state.accessControl,
+    uiTheme: state.uiTheme,
     notifyConfig: state.notifyConfig
   };
 }
@@ -2009,6 +2247,9 @@ function applyParsedState(parsed) {
         notes: unit.notes || ""
       }))
     : [];
+  state.accessPins = normalizeAccessPins(parsed.accessPins);
+  state.accessControl = normalizeAccessControl(parsed.accessControl);
+  state.uiTheme = normalizeTheme(parsed.uiTheme);
   state.notifyConfig = normalizeNotifyConfig(parsed.notifyConfig);
   relinkTenantsToUnits();
   state.activeMonth = sanitizeMonthKey(parsed.activeMonth);
@@ -2457,7 +2698,7 @@ function onEditorLogin(event) {
     alert("Enter PIN.");
     return;
   }
-  const mappedUser = PIN_TO_USER[pin] || "";
+  const mappedUser = getUserByPin(pin);
   const matched = mappedUser ? EDIT_USERS.find((user) => user.username === mappedUser) : null;
   if (!matched) {
     alert("Invalid PIN.");
@@ -2466,12 +2707,24 @@ function onEditorLogin(event) {
   editorUser = matched.username;
   localStorage.setItem(EDIT_ACCESS_KEY, editorUser);
   editorPinEl.value = "";
+  settingsEditMode.propertyAddress = false;
+  settingsEditMode.mailConfig = false;
+  settingsEditMode.accessControl = false;
+  settingsEditMode.accessPins = false;
+  settingsEditMode.theme = false;
   updateEditorStatusUi();
   try {
     renderAll();
   } catch (error) {
     console.error("Post-login render failed:", error);
   }
+}
+
+function getUserByPin(pin) {
+  if (pin && pin === getPinByUser("admin")) return "admin";
+  if (pin && pin === getPinByUser("manager")) return "manager";
+  if (pin && pin === getPinByUser("viewer")) return "viewer";
+  return "";
 }
 
 function onEditorLogout() {
@@ -2482,12 +2735,23 @@ function onEditorLogout() {
   cancelUnitEdit();
   activeTenantAddCardEl.classList.add("hidden");
   unitAddCardEl.classList.add("hidden");
+  settingsEditMode.propertyAddress = false;
+  settingsEditMode.mailConfig = false;
+  settingsEditMode.accessControl = false;
+  settingsEditMode.accessPins = false;
+  settingsEditMode.theme = false;
   updateEditorStatusUi();
   renderAll();
 }
 
 function getCurrentUserRecord() {
   return EDIT_USERS.find((user) => user.username === editorUser) || null;
+}
+
+function getPinByUser(username) {
+  const key = String(username || "").trim().toLowerCase();
+  if (!key) return "";
+  return String(state.accessPins?.[key] || "");
 }
 
 function isAuthenticated() {
@@ -2504,7 +2768,12 @@ function hasPermission(permission) {
 
   if (role === "admin") return true;
   if (role === "manager") {
-    return permission === "mark_paid" || permission === "notify_tenant";
+    if (permission === "mark_paid" || permission === "notify_tenant") return true;
+    if (permission === "tenant_edit") return Boolean(state.accessControl?.manager?.cards?.tenantEdit);
+    if (permission === "unit_edit") return false;
+    if (permission === "tenant_add") return Boolean(state.accessControl?.manager?.cards?.tenantAdd);
+    if (permission === "unit_add") return Boolean(state.accessControl?.manager?.tabs?.availableUnits);
+    return false;
   }
   return false;
 }
@@ -2533,11 +2802,28 @@ function applyAnonymousVisibility() {
   if (isAuthenticated()) {
     tabsContainerEl.classList.remove("hidden");
     dashboardNonMetricSections.forEach((section) => section.classList.remove("hidden"));
-    tabPanels.forEach((panel) => {
-      if (panel.dataset.tabPanel !== "dashboard" && panel.dataset.tabPanel !== "settings") {
-        panel.classList.remove("hidden");
-      }
-    });
+    tabPanels.forEach((panel) => panel.classList.remove("hidden"));
+    tabButtons.forEach((button) => button.classList.remove("hidden"));
+
+    const role = getCurrentRole();
+    if (role === "manager") {
+      setManagerTabVisibility();
+    } else {
+      tabButtons.forEach((button) => {
+        if (button.dataset.tabTarget !== "settings") button.classList.remove("hidden");
+      });
+      tabPanels.forEach((panel) => {
+        if (panel.dataset.tabPanel !== "settings") panel.classList.remove("hidden");
+      });
+    }
+
+    const canManageSettings = hasPermission("manage_notify_lists");
+    settingsTabBtnEl.classList.toggle("hidden", !canManageSettings);
+    settingsPanelEl.classList.toggle("hidden", !canManageSettings);
+    const currentActive = document.querySelector(".tab-btn.active");
+    if (currentActive && currentActive.classList.contains("hidden")) {
+      setActiveTab("dashboard");
+    }
     return;
   }
 
@@ -2554,6 +2840,29 @@ function applyAnonymousVisibility() {
   activeTenantAddCardEl.classList.add("hidden");
   activeTenantEditCardEl.classList.add("hidden");
   unitAddCardEl.classList.add("hidden");
+}
+
+function setManagerTabVisibility() {
+  const tabAccess = state.accessControl?.manager?.tabs || {};
+  const allowAvailableUnits = Boolean(tabAccess.availableUnits);
+  const allowActiveTenants = Boolean(tabAccess.activeTenants);
+  const allowLeaseStatus = Boolean(tabAccess.leaseStatus);
+
+  tabButtons.forEach((button) => {
+    const tab = button.dataset.tabTarget;
+    if (tab === "available-units") button.classList.toggle("hidden", !allowAvailableUnits);
+    if (tab === "active-tenants") button.classList.toggle("hidden", !allowActiveTenants);
+    if (tab === "lease-status") button.classList.toggle("hidden", !allowLeaseStatus);
+    if (tab === "settings") button.classList.add("hidden");
+  });
+
+  tabPanels.forEach((panel) => {
+    const tab = panel.dataset.tabPanel;
+    if (tab === "available-units") panel.classList.toggle("hidden", !allowAvailableUnits);
+    if (tab === "active-tenants") panel.classList.toggle("hidden", !allowActiveTenants);
+    if (tab === "lease-status") panel.classList.toggle("hidden", !allowLeaseStatus);
+    if (tab === "settings") panel.classList.add("hidden");
+  });
 }
 
 function getUnitLabel(unit) {
@@ -2686,6 +2995,76 @@ function relinkTenantsToUnits() {
     );
     return { ...tenant, linkedUnitId: matched ? matched.id : "" };
   });
+}
+
+function normalizeAccessPins(pins) {
+  const defaults = { viewer: "1111", manager: "2222", admin: "3333" };
+  const normalizePin = (value, fallback) => {
+    const raw = String(value || "").trim().replace(/\D/g, "");
+    return /^\d{4,8}$/.test(raw) ? raw : fallback;
+  };
+
+  const normalized = {
+    viewer: normalizePin(pins?.viewer, defaults.viewer),
+    manager: normalizePin(pins?.manager, defaults.manager),
+    admin: normalizePin(pins?.admin, defaults.admin)
+  };
+
+  const unique = new Set([normalized.viewer, normalized.manager, normalized.admin]);
+  if (unique.size !== 3) return defaults;
+  return normalized;
+}
+
+function normalizeAccessControl(config) {
+  const defaults = {
+    manager: {
+      tabs: {
+        availableUnits: true,
+        activeTenants: true,
+        leaseStatus: true
+      },
+      cards: {
+        tenantEdit: false,
+        tenantAdd: false
+      }
+    }
+  };
+  if (!config || typeof config !== "object") return defaults;
+  return {
+    manager: {
+      tabs: {
+        availableUnits:
+          config?.manager?.tabs?.availableUnits === undefined
+            ? defaults.manager.tabs.availableUnits
+            : Boolean(config.manager.tabs.availableUnits),
+        activeTenants:
+          config?.manager?.tabs?.activeTenants === undefined
+            ? defaults.manager.tabs.activeTenants
+            : Boolean(config.manager.tabs.activeTenants),
+        leaseStatus:
+          config?.manager?.tabs?.leaseStatus === undefined
+            ? defaults.manager.tabs.leaseStatus
+            : Boolean(config.manager.tabs.leaseStatus)
+      },
+      cards: {
+        tenantEdit:
+          config?.manager?.cards?.tenantEdit === undefined
+            ? defaults.manager.cards.tenantEdit
+            : Boolean(config.manager.cards.tenantEdit),
+        tenantAdd:
+          config?.manager?.cards?.tenantAdd === undefined
+            ? defaults.manager.cards.tenantAdd
+            : Boolean(config.manager.cards.tenantAdd)
+      }
+    }
+  };
+}
+
+function normalizeTheme(theme) {
+  const normalized = String(theme || "")
+    .trim()
+    .toLowerCase();
+  return UI_THEMES.includes(normalized) ? normalized : DEFAULT_UI_THEME;
 }
 
 function normalizeNotifyConfig(config) {
