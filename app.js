@@ -478,7 +478,7 @@ function renderActiveTenantsToday() {
         .slice()
         .sort(compareTenantsByUnitAscending)
         .forEach((tenant) => {
-          const canManageTenantsInActiveList = isAuthenticated() && getCurrentRole() !== "viewer";
+          const canManageTenantsInActiveList = hasPermission("tenant_edit");
           const editAction = canManageTenantsInActiveList
             ? `<button type="button" class="btn btn-small edit-tenant" data-tenant-id="${tenant.id}">Edit</button>`
             : "";
