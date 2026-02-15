@@ -640,6 +640,44 @@ textarea:focus {
   background: rgba(255, 255, 255, 0.82);
 }
 
+.existing-docs {
+  margin-top: 0.55rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.existing-docs-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #31271f;
+}
+
+.existing-docs-note {
+  font-size: 0.73rem;
+  color: #5b4b3d;
+}
+
+.existing-docs-empty {
+  font-size: 0.76rem;
+  color: #5b4b3d;
+}
+
+.existing-doc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid rgba(89, 68, 51, 0.16);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.existing-doc-item.marked-delete {
+  border-color: rgba(159, 58, 41, 0.45);
+  background: rgba(255, 226, 220, 0.62);
+}
+
 .unit-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -1084,6 +1122,36 @@ textarea:focus {
   font-weight: 700;
 }
 
+#unitAddCard {
+  overflow: hidden;
+}
+
+#unitAddCard .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+#unitAddCard label {
+  min-width: 0;
+}
+
+#unitAddCard input,
+#unitAddCard select,
+#unitAddCard textarea {
+  width: 100%;
+  min-width: 0;
+}
+
+#unitAddCard .actions {
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+#unitAddCard .btn {
+  white-space: nowrap;
+}
+
 @media (max-width: 700px) {
   .site-header {
     padding-top: 1.4rem;
@@ -1124,6 +1192,10 @@ textarea:focus {
 
   #activeTenantGroups .tenant-card-list,
   #leaseStatusGroups .tenant-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  #unitAddCard .form-grid {
     grid-template-columns: 1fr;
   }
 }
