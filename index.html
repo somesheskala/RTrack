@@ -18,7 +18,7 @@
       rel="stylesheet"
     />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260214ci" />
+    <link rel="stylesheet" href="styles.css?v=20260214cl" />
   </head>
   <body>
     <header class="site-header">
@@ -40,6 +40,8 @@
         <button class="tab-btn" data-tab-target="active-tenants">Tenants</button>
         <button class="tab-btn" data-tab-target="available-units">Units</button>
         <button class="tab-btn" data-tab-target="lease-status">Tenant Payments</button>
+        <button class="tab-btn" data-tab-target="maintenance">Maintenance</button>
+        <button class="tab-btn" data-tab-target="service-providers">Service Providers</button>
         <button class="tab-btn hidden" data-tab-target="settings" id="settingsTabBtn">Settings</button>
       </div>
 
@@ -276,7 +278,7 @@
               <button type="button" class="btn btn-small btn-muted hidden" id="cancelAccessControlBtn">Cancel</button>
             </div>
           </div>
-          <p>Admin can control manager access on tabs and edit cards.</p>
+          <p>Admin can control manager access on tabs and actions.</p>
           <div class="access-grid">
             <div class="access-group">
               <h3 class="subhead">Manager Tabs</h3>
@@ -292,16 +294,57 @@
                 <input type="checkbox" id="managerTabLeaseStatus" />
                 Lease Payment Status Tab
               </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="managerTabMaintenance" />
+                Maintenance Tab
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="managerTabServiceProviders" />
+                Service Providers Tab
+              </label>
             </div>
             <div class="access-group">
-              <h3 class="subhead">Manager Active Tenants Cards</h3>
+              <h3 class="subhead">Manager Tenant Actions</h3>
               <label class="checkbox-label">
                 <input type="checkbox" id="managerAccessTenantEdit" />
-                Active Tenant Edit Card
+                Edit Tenant
               </label>
               <label class="checkbox-label">
                 <input type="checkbox" id="managerAccessTenantAdd" />
-                Active Tenant Add Card
+                Add Tenant
+              </label>
+            </div>
+            <div class="access-group">
+              <h3 class="subhead">Manager Unit Actions</h3>
+              <label class="checkbox-label">
+                <input type="checkbox" id="managerAccessUnitEdit" />
+                Edit Unit
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="managerAccessUnitAdd" />
+                Add Unit
+              </label>
+            </div>
+            <div class="access-group">
+              <h3 class="subhead">Manager Maintenance Actions</h3>
+              <label class="checkbox-label">
+                <input type="checkbox" id="managerAccessMaintenanceAdd" />
+                Create Maintenance
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="managerAccessMaintenanceEdit" />
+                Edit Maintenance
+              </label>
+            </div>
+            <div class="access-group">
+              <h3 class="subhead">Manager Service Provider Actions</h3>
+              <label class="checkbox-label">
+                <input type="checkbox" id="managerAccessServiceProviderAdd" />
+                Create Service Provider
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="managerAccessServiceProviderEdit" />
+                Edit Service Provider
               </label>
             </div>
           </div>
@@ -372,6 +415,108 @@
             </div>
           </div>
           <div id="leaseStatusGroups"></div>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="maintenance">
+        <section class="card hidden" id="maintenanceAddCard">
+          <h2 id="maintenanceFormTitle">Add Maintenance Expense</h2>
+          <form id="maintenance-form">
+            <div class="form-grid">
+              <label>
+                Month
+                <input type="month" id="maintenanceMonth" required />
+              </label>
+              <label>
+                Building
+                <select id="maintenanceBuilding" required>
+                  <option value="">Select Building</option>
+                </select>
+              </label>
+              <label>
+                Category
+                <select id="maintenanceCategory" required>
+                  <option value="">Select Category</option>
+                  <option value="Common Power Bill">Common Power Bill</option>
+                  <option value="Security Guard Salary">Security Guard Salary</option>
+                  <option value="Trash Charges">Trash Charges</option>
+                  <option value="Water Charges">Water Charges</option>
+                  <option value="RO Water Filter Charges">RO Water Filter Charges</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+              <label>
+                Amount (₹)
+                <input type="number" id="maintenanceAmount" min="0" step="0.01" required />
+              </label>
+              <label>
+                Notes
+                <textarea id="maintenanceNotes" rows="3" placeholder="Optional notes..."></textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn" id="maintenanceSubmitBtn">Save Expense</button>
+              <button type="button" class="btn btn-muted" id="cancelMaintenanceEdit">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="table-head">
+            <h2>Monthly Building Maintenance (<span id="maintenanceMonthLabel"></span>)</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small btn-muted" id="expandMaintenance" title="Expand All" aria-label="Expand All">▼</button>
+              <button type="button" class="btn btn-small btn-muted" id="collapseMaintenance" title="Collapse All" aria-label="Collapse All">▲</button>
+              <button type="button" class="btn btn-small" id="addMaintenanceFromTab">Add Expense</button>
+            </div>
+          </div>
+          <div id="maintenanceGroups"></div>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-tab-panel="service-providers">
+        <section class="card hidden" id="serviceProviderAddCard">
+          <h2 id="serviceProviderFormTitle">Add Service Provider</h2>
+          <form id="service-provider-form">
+            <div class="form-grid">
+              <label>
+                Service Name
+                <input type="text" id="serviceName" required placeholder="Plumbing" />
+              </label>
+              <label>
+                Technician Name
+                <input type="text" id="serviceTechnicianName" required placeholder="Ravi Kumar" />
+              </label>
+              <label>
+                Mobile Number
+                <input type="tel" id="serviceMobile" placeholder="+91 9876543210" />
+              </label>
+              <label>
+                URL
+                <input type="url" id="serviceUrl" placeholder="https://example.com" />
+              </label>
+              <label>
+                Notes
+                <textarea id="serviceNotes" rows="3" placeholder="Optional notes..."></textarea>
+              </label>
+            </div>
+            <div class="actions">
+              <button type="submit" class="btn" id="serviceProviderSubmitBtn">Save Provider</button>
+              <button type="button" class="btn btn-muted" id="cancelServiceProviderEdit">Cancel</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="table-head">
+            <h2>Service Providers</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small btn-muted" id="expandServiceProviders" title="Expand All" aria-label="Expand All">▼</button>
+              <button type="button" class="btn btn-small btn-muted" id="collapseServiceProviders" title="Collapse All" aria-label="Collapse All">▲</button>
+              <button type="button" class="btn btn-small" id="addServiceProviderFromTab">Add Provider</button>
+            </div>
+          </div>
+          <div id="serviceProviderGroups"></div>
         </section>
       </section>
 
@@ -472,8 +617,8 @@
         });
       })();
     </script>
-    <script src="config.js?v=20260214ci"></script>
-    <script src="utils.js?v=20260214ci"></script>
-    <script src="app.js?v=20260214ci"></script>
+    <script src="config.js?v=20260214cl"></script>
+    <script src="utils.js?v=20260214cl"></script>
+    <script src="app.js?v=20260214cl"></script>
   </body>
 </html>

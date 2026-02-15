@@ -93,6 +93,8 @@ const state = {
   activeMonth: getCurrentMonth(),
   tenants: [],
   units: [],
+  maintenanceEntries: [],
+  serviceProviders: [],
   accessPins: {
     viewer: "1111",
     manager: "2222",
@@ -103,11 +105,19 @@ const state = {
       tabs: {
         availableUnits: true,
         activeTenants: true,
-        leaseStatus: true
+        leaseStatus: true,
+        maintenance: true,
+        serviceProviders: true
       },
       cards: {
         tenantEdit: false,
-        tenantAdd: false
+        tenantAdd: false,
+        unitEdit: false,
+        unitAdd: true,
+        maintenanceAdd: false,
+        maintenanceEdit: false,
+        serviceProviderAdd: false,
+        serviceProviderEdit: false
       }
     }
   },
@@ -163,6 +173,35 @@ const leaseStatusGroupsEl = document.getElementById("leaseStatusGroups");
 const leaseStatusMonthLabelEl = document.getElementById("leaseStatusMonthLabel");
 const expandLeaseStatusEl = document.getElementById("expandLeaseStatus");
 const collapseLeaseStatusEl = document.getElementById("collapseLeaseStatus");
+const maintenanceGroupsEl = document.getElementById("maintenanceGroups");
+const maintenanceMonthLabelEl = document.getElementById("maintenanceMonthLabel");
+const maintenanceFormEl = document.getElementById("maintenance-form");
+const maintenanceAddCardEl = document.getElementById("maintenanceAddCard");
+const maintenanceFormTitleEl = document.getElementById("maintenanceFormTitle");
+const maintenanceMonthEl = document.getElementById("maintenanceMonth");
+const maintenanceBuildingEl = document.getElementById("maintenanceBuilding");
+const maintenanceCategoryEl = document.getElementById("maintenanceCategory");
+const maintenanceAmountEl = document.getElementById("maintenanceAmount");
+const maintenanceNotesEl = document.getElementById("maintenanceNotes");
+const maintenanceSubmitBtnEl = document.getElementById("maintenanceSubmitBtn");
+const cancelMaintenanceEditEl = document.getElementById("cancelMaintenanceEdit");
+const addMaintenanceFromTabEl = document.getElementById("addMaintenanceFromTab");
+const expandMaintenanceEl = document.getElementById("expandMaintenance");
+const collapseMaintenanceEl = document.getElementById("collapseMaintenance");
+const serviceProviderGroupsEl = document.getElementById("serviceProviderGroups");
+const serviceProviderFormEl = document.getElementById("service-provider-form");
+const serviceProviderAddCardEl = document.getElementById("serviceProviderAddCard");
+const serviceProviderFormTitleEl = document.getElementById("serviceProviderFormTitle");
+const serviceNameEl = document.getElementById("serviceName");
+const serviceTechnicianNameEl = document.getElementById("serviceTechnicianName");
+const serviceMobileEl = document.getElementById("serviceMobile");
+const serviceUrlEl = document.getElementById("serviceUrl");
+const serviceNotesEl = document.getElementById("serviceNotes");
+const serviceProviderSubmitBtnEl = document.getElementById("serviceProviderSubmitBtn");
+const cancelServiceProviderEditEl = document.getElementById("cancelServiceProviderEdit");
+const addServiceProviderFromTabEl = document.getElementById("addServiceProviderFromTab");
+const expandServiceProvidersEl = document.getElementById("expandServiceProviders");
+const collapseServiceProvidersEl = document.getElementById("collapseServiceProviders");
 const adminEmailListEl = document.getElementById("adminEmailList");
 const managerEmailListEl = document.getElementById("managerEmailList");
 const emailjsPublicKeyEl = document.getElementById("emailjsPublicKey");
@@ -186,8 +225,16 @@ const cancelAccessControlBtnEl = document.getElementById("cancelAccessControlBtn
 const managerTabAvailableUnitsEl = document.getElementById("managerTabAvailableUnits");
 const managerTabActiveTenantsEl = document.getElementById("managerTabActiveTenants");
 const managerTabLeaseStatusEl = document.getElementById("managerTabLeaseStatus");
+const managerTabMaintenanceEl = document.getElementById("managerTabMaintenance");
+const managerTabServiceProvidersEl = document.getElementById("managerTabServiceProviders");
 const managerAccessTenantEditEl = document.getElementById("managerAccessTenantEdit");
 const managerAccessTenantAddEl = document.getElementById("managerAccessTenantAdd");
+const managerAccessUnitEditEl = document.getElementById("managerAccessUnitEdit");
+const managerAccessUnitAddEl = document.getElementById("managerAccessUnitAdd");
+const managerAccessMaintenanceAddEl = document.getElementById("managerAccessMaintenanceAdd");
+const managerAccessMaintenanceEditEl = document.getElementById("managerAccessMaintenanceEdit");
+const managerAccessServiceProviderAddEl = document.getElementById("managerAccessServiceProviderAdd");
+const managerAccessServiceProviderEditEl = document.getElementById("managerAccessServiceProviderEdit");
 const accessPinsSectionEl = document.getElementById("accessPinsSection");
 const editAccessPinsBtnEl = document.getElementById("editAccessPinsBtn");
 const saveAccessPinsBtnEl = document.getElementById("saveAccessPinsBtn");
@@ -222,6 +269,8 @@ const editorStatusEl = document.getElementById("editorStatus");
 const manualRefreshBtnEl = document.getElementById("manualRefreshBtn");
 let editingTenantId = "";
 let editingUnitId = "";
+let editingMaintenanceId = "";
+let editingServiceProviderId = "";
 let editDocKeysToDelete = new Set();
 let editorUser = "";
 let supabaseClient = null;
@@ -293,6 +342,57 @@ async function init() {
     buildingNameEl.scrollIntoView({ behavior: "smooth", block: "center" });
     buildingNameEl.focus();
   });
+  if (maintenanceFormEl) {
+    maintenanceFormEl.addEventListener("submit", onSaveMaintenanceEntry);
+  }
+  if (cancelMaintenanceEditEl) {
+    cancelMaintenanceEditEl.addEventListener("click", cancelMaintenanceEdit);
+  }
+  if (addMaintenanceFromTabEl) {
+    addMaintenanceFromTabEl.addEventListener("click", () => {
+      if (!hasPermission("maintenance_add")) {
+        alert("You do not have permission to add maintenance expenses.");
+        return;
+      }
+      maintenanceAddCardEl.classList.remove("hidden");
+      maintenanceMonthEl.value = sanitizeMonthKey(state.activeMonth);
+      maintenanceMonthEl.focus();
+    });
+  }
+  if (expandMaintenanceEl) {
+    expandMaintenanceEl.addEventListener("click", () => setAllMaintenanceGroups(true));
+  }
+  if (collapseMaintenanceEl) {
+    collapseMaintenanceEl.addEventListener("click", () => setAllMaintenanceGroups(false));
+  }
+  if (maintenanceGroupsEl) {
+    maintenanceGroupsEl.addEventListener("click", onMaintenanceGroupAction);
+  }
+  if (serviceProviderFormEl) {
+    serviceProviderFormEl.addEventListener("submit", onSaveServiceProvider);
+  }
+  if (cancelServiceProviderEditEl) {
+    cancelServiceProviderEditEl.addEventListener("click", cancelServiceProviderEdit);
+  }
+  if (addServiceProviderFromTabEl) {
+    addServiceProviderFromTabEl.addEventListener("click", () => {
+      if (!hasPermission("service_provider_add")) {
+        alert("You do not have permission to add service providers.");
+        return;
+      }
+      serviceProviderAddCardEl.classList.remove("hidden");
+      serviceNameEl.focus();
+    });
+  }
+  if (expandServiceProvidersEl) {
+    expandServiceProvidersEl.addEventListener("click", () => setAllServiceProviderGroups(true));
+  }
+  if (collapseServiceProvidersEl) {
+    collapseServiceProvidersEl.addEventListener("click", () => setAllServiceProviderGroups(false));
+  }
+  if (serviceProviderGroupsEl) {
+    serviceProviderGroupsEl.addEventListener("click", onServiceProviderGroupAction);
+  }
   if (editPropertyAddressBtnEl) {
     editPropertyAddressBtnEl.addEventListener("click", () => setSettingsSectionMode("propertyAddress", true));
   }
@@ -467,6 +567,8 @@ function renderAll() {
     renderRows();
     renderLeaseStatusRows();
     renderUnits();
+    renderMaintenanceRows();
+    renderServiceProviders();
     renderNotifyConfig();
     renderTenantNameOptions();
     renderPropertyNameOptions();
@@ -684,6 +786,7 @@ function renderMetrics() {
   const totalSecurityDeposit = activeTenants.reduce((sum, tenant) => sum + Number(tenant.deposit || 0), 0);
   const byBuilding = getBuildingTotalsForMonth(monthKey, activeTenants);
   const depositByBuilding = getBuildingDepositTotals(activeTenants);
+  const maintenanceTotals = getMaintenanceTotalsByBuilding(monthKey);
   const sortedBuildingTotals = byBuilding.slice().sort(([a], [b]) => a.localeCompare(b));
   const expectedBreakdown = sortedBuildingTotals
     .map(([building, totalsByBuilding]) => `${escapeHtml(building)} Rent Expected: ${money(totalsByBuilding.expected)}`)
@@ -700,6 +803,9 @@ function renderMetrics() {
   const depositBreakdown = sortedBuildingTotals
     .map(([building]) => `${escapeHtml(building)} Security Deposit: ${money(depositByBuilding.get(building) || 0)}`)
     .join("<br>");
+  const maintenanceBreakdown = maintenanceTotals.entries
+    .map(([building, amount]) => `${escapeHtml(building)} Maintenance: ${money(amount)}`)
+    .join("<br>");
 
   metricsEl.innerHTML = `
     <div class="metrics-section-title">Units (${escapeHtml(currentMonthLabel)})</div>
@@ -714,6 +820,10 @@ function renderMetrics() {
       <div class="metric-box">Total Rent Collected<strong>${money(totals.collected)}</strong><small>${collectedBreakdown || "-"}</small></div>
       <div class="metric-box">Total Rent Outstanding<strong>${money(totals.expected - totals.collected)}</strong><small>${outstandingBreakdown || "-"}</small></div>
       <div class="metric-box">Total Security Deposit<strong>${money(totalSecurityDeposit)}</strong><small>${depositBreakdown || "-"}</small></div>
+    </div>
+    <div class="metrics-section-title">Maintenance (${formatMonth(monthKey)})</div>
+    <div class="metrics-row">
+      <div class="metric-box">Total Maintenance<strong>${money(maintenanceTotals.total)}</strong><small>${maintenanceBreakdown || "-"}</small></div>
     </div>
   `;
   metricsEl.dataset.appRendered = "1";
@@ -1485,6 +1595,472 @@ function getUnitOccupancySummary() {
   return totals;
 }
 
+function renderMaintenanceRows() {
+  if (!maintenanceGroupsEl) return;
+  maintenanceGroupsEl.innerHTML = "";
+  const monthKey = sanitizeMonthKey(state.activeMonth);
+  const monthLabel = formatMonth(monthKey);
+  if (maintenanceMonthLabelEl) maintenanceMonthLabelEl.textContent = monthLabel;
+  if (maintenanceMonthEl) maintenanceMonthEl.value = monthKey;
+  renderMaintenanceBuildingOptions();
+
+  const canAddMaintenance = hasPermission("maintenance_add");
+  const canEditMaintenance = hasPermission("maintenance_edit");
+  if (addMaintenanceFromTabEl) {
+    addMaintenanceFromTabEl.classList.toggle("hidden", !canAddMaintenance);
+  }
+  if (!canAddMaintenance && maintenanceAddCardEl) {
+    maintenanceAddCardEl.classList.add("hidden");
+  }
+
+  const monthEntries = getMaintenanceEntriesForMonth(monthKey);
+  if (!monthEntries.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-note";
+    empty.textContent = `No maintenance expenses recorded for ${monthLabel}.`;
+    maintenanceGroupsEl.appendChild(empty);
+    return;
+  }
+
+  groupByBuilding(monthEntries, (entry) => entry.buildingName).forEach(([building, entries]) => {
+    const buildingTotal = entries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+    const group = document.createElement("details");
+    group.className = "tenant-group maintenance-group";
+    group.open = false;
+    group.innerHTML = `
+      <summary>
+        <span>${escapeHtml(building)}</span>
+        <span class="tenant-group-count">Entries: ${entries.length} | Total: ${money(buildingTotal)}</span>
+      </summary>
+    `;
+
+    const list = document.createElement("div");
+    list.className = "tenant-card-list";
+
+    entries
+      .slice()
+      .sort((a, b) => String(a.category || "").localeCompare(String(b.category || ""), undefined, { sensitivity: "base" }))
+      .forEach((entry) => {
+        const card = document.createElement("article");
+        card.className = "tenant-card maintenance-card";
+        card.dataset.maintenanceId = entry.id;
+        const actions = canEditMaintenance
+          ? `
+            <button type="button" class="btn btn-small edit-maintenance" data-maintenance-id="${entry.id}">Edit</button>
+            <button type="button" class="btn btn-small btn-danger delete-maintenance" data-maintenance-id="${entry.id}">Delete</button>
+          `
+          : "No actions";
+        card.innerHTML = `
+          <div class="tenant-card-grid">
+            <div><span>Category</span><strong>${escapeHtml(entry.category)}</strong></div>
+            <div><span>Amount</span><strong>${money(entry.amount)}</strong></div>
+            <div><span>Month</span><strong>${escapeHtml(formatMonth(entry.monthKey))}</strong></div>
+          </div>
+          <div class="tenant-card-notes"><span>Notes:</span> ${entry.notes ? escapeHtml(entry.notes) : "-"}</div>
+          <div class="actions maintenance-actions">${actions}</div>
+        `;
+        list.appendChild(card);
+      });
+
+    group.appendChild(list);
+    maintenanceGroupsEl.appendChild(group);
+  });
+}
+
+function onSaveMaintenanceEntry(event) {
+  event.preventDefault();
+  const canAdd = hasPermission("maintenance_add");
+  const canEdit = hasPermission("maintenance_edit");
+  if (!editingMaintenanceId && !canAdd) {
+    alert("You do not have permission to add maintenance expenses.");
+    return;
+  }
+  if (editingMaintenanceId && !canEdit) {
+    alert("You do not have permission to edit maintenance expenses.");
+    return;
+  }
+
+  const monthKey = sanitizeMonthKey(maintenanceMonthEl?.value || state.activeMonth);
+  const selectedBuildingValue = String(maintenanceBuildingEl?.value || "").trim();
+  const buildingName = normalizeUnitText(selectedBuildingValue);
+  const category = String(maintenanceCategoryEl?.value || "").trim();
+  const amount = Number(maintenanceAmountEl?.value || 0);
+  const notes = String(maintenanceNotesEl?.value || "").trim();
+
+  if (!selectedBuildingValue) {
+    alert("Select a building.");
+    return;
+  }
+  if (!category) {
+    alert("Select maintenance category.");
+    return;
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    alert("Enter a valid maintenance amount.");
+    return;
+  }
+
+  if (selectedBuildingValue === "__all_buildings_split__") {
+    if (editingMaintenanceId) {
+      alert("For split common expense, add as new entry instead of editing existing one.");
+      return;
+    }
+    const buildings = getKnownBuildingNames();
+    if (buildings.length !== 3) {
+      alert("Common split is supported when exactly 3 buildings are available.");
+      return;
+    }
+    const perBuilding = Math.floor((amount / 3) * 100) / 100;
+    const allocated = Number((perBuilding * 2).toFixed(2));
+    const thirdAmount = Number((amount - allocated).toFixed(2));
+    const splitAmounts = [perBuilding, perBuilding, thirdAmount];
+
+    buildings.forEach((building, index) => {
+      state.maintenanceEntries.push({
+        id: crypto.randomUUID(),
+        monthKey,
+        buildingName: building,
+        category,
+        amount: splitAmounts[index],
+        notes: notes ? `${notes} (Common split)` : "Common split"
+      });
+    });
+
+    state.activeMonth = monthKey;
+    if (activeMonthInput) activeMonthInput.value = monthKey;
+    saveState();
+    resetMaintenanceForm();
+    renderAll();
+    return;
+  }
+
+  if (editingMaintenanceId) {
+    const entry = state.maintenanceEntries.find((item) => item.id === editingMaintenanceId);
+    if (!entry) return;
+    entry.monthKey = monthKey;
+    entry.buildingName = buildingName;
+    entry.category = category;
+    entry.amount = amount;
+    entry.notes = notes;
+  } else {
+    state.maintenanceEntries.push({
+      id: crypto.randomUUID(),
+      monthKey,
+      buildingName,
+      category,
+      amount,
+      notes
+    });
+  }
+
+  state.activeMonth = monthKey;
+  if (activeMonthInput) activeMonthInput.value = monthKey;
+  saveState();
+  resetMaintenanceForm();
+  renderAll();
+}
+
+function startEditMaintenance(entryId) {
+  if (!hasPermission("maintenance_edit")) {
+    alert("You do not have permission to edit maintenance expenses.");
+    return;
+  }
+  const entry = state.maintenanceEntries.find((item) => item.id === entryId);
+  if (!entry) return;
+  editingMaintenanceId = entry.id;
+  maintenanceAddCardEl.classList.remove("hidden");
+  maintenanceFormTitleEl.textContent = "Edit Maintenance Expense";
+  maintenanceSubmitBtnEl.textContent = "Update Expense";
+  cancelMaintenanceEditEl.textContent = "Cancel Edit";
+  maintenanceMonthEl.value = sanitizeMonthKey(entry.monthKey);
+  maintenanceBuildingEl.value = entry.buildingName;
+  maintenanceCategoryEl.value = entry.category;
+  maintenanceAmountEl.value = Number(entry.amount || 0);
+  maintenanceNotesEl.value = entry.notes || "";
+  maintenanceMonthEl.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function cancelMaintenanceEdit() {
+  resetMaintenanceForm();
+  if (maintenanceAddCardEl) maintenanceAddCardEl.classList.add("hidden");
+}
+
+function resetMaintenanceForm() {
+  editingMaintenanceId = "";
+  if (maintenanceFormEl) maintenanceFormEl.reset();
+  if (maintenanceMonthEl) maintenanceMonthEl.value = sanitizeMonthKey(state.activeMonth);
+  if (maintenanceFormTitleEl) maintenanceFormTitleEl.textContent = "Add Maintenance Expense";
+  if (maintenanceSubmitBtnEl) maintenanceSubmitBtnEl.textContent = "Save Expense";
+  if (cancelMaintenanceEditEl) cancelMaintenanceEditEl.textContent = "Cancel";
+}
+
+function deleteMaintenanceEntry(entryId) {
+  if (!hasPermission("maintenance_edit")) {
+    alert("You do not have permission to delete maintenance expenses.");
+    return;
+  }
+  const approved = confirm("Delete this maintenance entry?");
+  if (!approved) return;
+  state.maintenanceEntries = state.maintenanceEntries.filter((item) => item.id !== entryId);
+  if (editingMaintenanceId === entryId) {
+    cancelMaintenanceEdit();
+  }
+  saveState();
+  renderAll();
+}
+
+function onMaintenanceGroupAction(event) {
+  const editBtn = event.target.closest(".edit-maintenance");
+  if (editBtn) {
+    const entryId = editBtn.dataset.maintenanceId || "";
+    if (entryId) startEditMaintenance(entryId);
+    return;
+  }
+  const deleteBtn = event.target.closest(".delete-maintenance");
+  if (deleteBtn) {
+    const entryId = deleteBtn.dataset.maintenanceId || "";
+    if (entryId) deleteMaintenanceEntry(entryId);
+  }
+}
+
+function setAllMaintenanceGroups(isOpen) {
+  maintenanceGroupsEl.querySelectorAll(".maintenance-group").forEach((group) => {
+    group.open = isOpen;
+  });
+}
+
+function getMaintenanceEntriesForMonth(monthKey) {
+  const safeMonth = sanitizeMonthKey(monthKey);
+  return state.maintenanceEntries.filter((entry) => sanitizeMonthKey(entry.monthKey) === safeMonth);
+}
+
+function getMaintenanceTotalsByBuilding(monthKey) {
+  const totals = new Map();
+  const monthEntries = getMaintenanceEntriesForMonth(monthKey);
+  monthEntries.forEach((entry) => {
+    const building = normalizeUnitText(entry.buildingName) || "Unknown";
+    totals.set(building, (totals.get(building) || 0) + Number(entry.amount || 0));
+  });
+  const entries = [...totals.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const total = entries.reduce((sum, [, amount]) => sum + amount, 0);
+  return { total, entries };
+}
+
+function renderMaintenanceBuildingOptions() {
+  if (!maintenanceBuildingEl) return;
+  const currentValue = maintenanceBuildingEl.value;
+  const buildings = getKnownBuildingNames();
+  const splitOption =
+    buildings.length === 3
+      ? `<option value="__all_buildings_split__">All 3 Buildings (Common split by 3)</option>`
+      : "";
+  maintenanceBuildingEl.innerHTML =
+    `<option value="">Select Building</option>` +
+    splitOption +
+    buildings.map((building) => `<option value="${escapeHtml(building)}">${escapeHtml(building)}</option>`).join("");
+  if (currentValue && buildings.includes(currentValue)) {
+    maintenanceBuildingEl.value = currentValue;
+  } else if (currentValue === "__all_buildings_split__" && buildings.length === 3) {
+    maintenanceBuildingEl.value = "__all_buildings_split__";
+  }
+}
+
+function renderServiceProviders() {
+  if (!serviceProviderGroupsEl) return;
+  serviceProviderGroupsEl.innerHTML = "";
+  const canAdd = hasPermission("service_provider_add");
+  const canEdit = hasPermission("service_provider_edit");
+  if (addServiceProviderFromTabEl) {
+    addServiceProviderFromTabEl.classList.toggle("hidden", !canAdd);
+  }
+  if (!canAdd && serviceProviderAddCardEl) {
+    serviceProviderAddCardEl.classList.add("hidden");
+  }
+
+  if (!state.serviceProviders.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-note";
+    empty.textContent = "No service providers added yet.";
+    serviceProviderGroupsEl.appendChild(empty);
+    return;
+  }
+
+  groupByBuilding(state.serviceProviders, (entry) => entry.serviceName).forEach(([serviceName, providers]) => {
+    const group = document.createElement("details");
+    group.className = "tenant-group service-provider-group";
+    group.open = false;
+    group.innerHTML = `
+      <summary>
+        <span>${escapeHtml(serviceName)}</span>
+        <span class="tenant-group-count">${providers.length} provider${providers.length === 1 ? "" : "s"}</span>
+      </summary>
+    `;
+
+    const list = document.createElement("div");
+    list.className = "tenant-card-list";
+
+    providers
+      .slice()
+      .sort((a, b) => String(a.technicianName || "").localeCompare(String(b.technicianName || ""), undefined, { sensitivity: "base" }))
+      .forEach((provider) => {
+        const card = document.createElement("article");
+        card.className = "tenant-card service-provider-card";
+        card.dataset.serviceProviderId = provider.id;
+        const urlHtml = provider.url
+          ? `<a class="doc-link" href="${escapeHtml(provider.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(provider.url)}</a>`
+          : "-";
+        const actions = canEdit
+          ? `
+            <button type="button" class="btn btn-small edit-service-provider" data-service-provider-id="${provider.id}">Edit</button>
+            <button type="button" class="btn btn-small btn-danger delete-service-provider" data-service-provider-id="${provider.id}">Delete</button>
+          `
+          : "No actions";
+        card.innerHTML = `
+          <div class="tenant-card-grid">
+            <div><span>Technician</span><strong>${escapeHtml(provider.technicianName)}</strong></div>
+            <div><span>Mobile</span><strong>${provider.mobile ? escapeHtml(provider.mobile) : "-"}</strong></div>
+            <div><span>URL</span><strong>${urlHtml}</strong></div>
+          </div>
+          <div class="tenant-card-notes"><span>Notes:</span> ${provider.notes ? escapeHtml(provider.notes) : "-"}</div>
+          <div class="actions service-provider-actions">${actions}</div>
+        `;
+        list.appendChild(card);
+      });
+
+    group.appendChild(list);
+    serviceProviderGroupsEl.appendChild(group);
+  });
+}
+
+function onSaveServiceProvider(event) {
+  event.preventDefault();
+  const canAddProvider = hasPermission("service_provider_add");
+  const canEditProvider = hasPermission("service_provider_edit");
+  if (!editingServiceProviderId && !canAddProvider) {
+    alert("You do not have permission to add service providers.");
+    return;
+  }
+  if (editingServiceProviderId && !canEditProvider) {
+    alert("You do not have permission to edit service providers.");
+    return;
+  }
+
+  const serviceName = normalizeUnitText(serviceNameEl?.value || "");
+  const technicianName = String(serviceTechnicianNameEl?.value || "").trim();
+  const parsedMobile = parseIndianMobile(serviceMobileEl?.value || "");
+  const url = String(serviceUrlEl?.value || "").trim();
+  const notes = String(serviceNotesEl?.value || "").trim();
+
+  if (!serviceName) {
+    alert("Enter service name.");
+    return;
+  }
+  if (!technicianName) {
+    alert("Enter technician name.");
+    return;
+  }
+  if (parsedMobile === null) {
+    alert("Enter a valid Indian mobile number (10 digits, optionally with +91).");
+    return;
+  }
+  if (url && !/^https?:\/\//i.test(url)) {
+    alert("URL must start with http:// or https://");
+    return;
+  }
+
+  if (editingServiceProviderId) {
+    const provider = state.serviceProviders.find((entry) => entry.id === editingServiceProviderId);
+    if (!provider) return;
+    provider.serviceName = serviceName;
+    provider.technicianName = technicianName;
+    provider.mobile = parsedMobile || "";
+    provider.url = url;
+    provider.notes = notes;
+  } else {
+    state.serviceProviders.push({
+      id: crypto.randomUUID(),
+      serviceName,
+      technicianName,
+      mobile: parsedMobile || "",
+      url,
+      notes
+    });
+  }
+
+  saveState();
+  resetServiceProviderForm();
+  renderAll();
+}
+
+function startEditServiceProvider(providerId) {
+  if (!hasPermission("service_provider_edit")) {
+    alert("You do not have permission to edit service providers.");
+    return;
+  }
+  const provider = state.serviceProviders.find((entry) => entry.id === providerId);
+  if (!provider) return;
+  editingServiceProviderId = provider.id;
+  serviceProviderAddCardEl.classList.remove("hidden");
+  serviceProviderFormTitleEl.textContent = "Edit Service Provider";
+  serviceProviderSubmitBtnEl.textContent = "Update Provider";
+  cancelServiceProviderEditEl.textContent = "Cancel Edit";
+  serviceNameEl.value = provider.serviceName || "";
+  serviceTechnicianNameEl.value = provider.technicianName || "";
+  serviceMobileEl.value = provider.mobile || "";
+  serviceUrlEl.value = provider.url || "";
+  serviceNotesEl.value = provider.notes || "";
+  serviceNameEl.scrollIntoView({ behavior: "smooth", block: "center" });
+  serviceNameEl.focus();
+}
+
+function cancelServiceProviderEdit() {
+  resetServiceProviderForm();
+  if (serviceProviderAddCardEl) serviceProviderAddCardEl.classList.add("hidden");
+}
+
+function resetServiceProviderForm() {
+  editingServiceProviderId = "";
+  if (serviceProviderFormEl) serviceProviderFormEl.reset();
+  if (serviceProviderFormTitleEl) serviceProviderFormTitleEl.textContent = "Add Service Provider";
+  if (serviceProviderSubmitBtnEl) serviceProviderSubmitBtnEl.textContent = "Save Provider";
+  if (cancelServiceProviderEditEl) cancelServiceProviderEditEl.textContent = "Cancel";
+}
+
+function deleteServiceProvider(providerId) {
+  if (!hasPermission("service_provider_edit")) {
+    alert("You do not have permission to delete service providers.");
+    return;
+  }
+  const approved = confirm("Delete this service provider?");
+  if (!approved) return;
+  state.serviceProviders = state.serviceProviders.filter((entry) => entry.id !== providerId);
+  if (editingServiceProviderId === providerId) {
+    cancelServiceProviderEdit();
+  }
+  saveState();
+  renderAll();
+}
+
+function onServiceProviderGroupAction(event) {
+  const editBtn = event.target.closest(".edit-service-provider");
+  if (editBtn) {
+    const providerId = editBtn.dataset.serviceProviderId || "";
+    if (providerId) startEditServiceProvider(providerId);
+    return;
+  }
+  const deleteBtn = event.target.closest(".delete-service-provider");
+  if (deleteBtn) {
+    const providerId = deleteBtn.dataset.serviceProviderId || "";
+    if (providerId) deleteServiceProvider(providerId);
+  }
+}
+
+function setAllServiceProviderGroups(isOpen) {
+  serviceProviderGroupsEl.querySelectorAll(".service-provider-group").forEach((group) => {
+    group.open = isOpen;
+  });
+}
+
 function notifyTenant(tenant, monthKey) {
   if (!hasPermission("notify_tenant")) {
     alert("You do not have permission to notify tenants.");
@@ -1628,8 +2204,20 @@ function renderAccessControlSettings() {
   if (managerTabAvailableUnitsEl) managerTabAvailableUnitsEl.checked = Boolean(managerTabs.availableUnits);
   if (managerTabActiveTenantsEl) managerTabActiveTenantsEl.checked = Boolean(managerTabs.activeTenants);
   if (managerTabLeaseStatusEl) managerTabLeaseStatusEl.checked = Boolean(managerTabs.leaseStatus);
+  if (managerTabMaintenanceEl) managerTabMaintenanceEl.checked = Boolean(managerTabs.maintenance);
+  if (managerTabServiceProvidersEl) managerTabServiceProvidersEl.checked = Boolean(managerTabs.serviceProviders);
   if (managerAccessTenantEditEl) managerAccessTenantEditEl.checked = Boolean(managerCards.tenantEdit);
   if (managerAccessTenantAddEl) managerAccessTenantAddEl.checked = Boolean(managerCards.tenantAdd);
+  if (managerAccessUnitEditEl) managerAccessUnitEditEl.checked = Boolean(managerCards.unitEdit);
+  if (managerAccessUnitAddEl) managerAccessUnitAddEl.checked = Boolean(managerCards.unitAdd);
+  if (managerAccessMaintenanceAddEl) managerAccessMaintenanceAddEl.checked = Boolean(managerCards.maintenanceAdd);
+  if (managerAccessMaintenanceEditEl) managerAccessMaintenanceEditEl.checked = Boolean(managerCards.maintenanceEdit);
+  if (managerAccessServiceProviderAddEl) {
+    managerAccessServiceProviderAddEl.checked = Boolean(managerCards.serviceProviderAdd);
+  }
+  if (managerAccessServiceProviderEditEl) {
+    managerAccessServiceProviderEditEl.checked = Boolean(managerCards.serviceProviderEdit);
+  }
 }
 
 function saveAccessControlConfig() {
@@ -1642,11 +2230,19 @@ function saveAccessControlConfig() {
       tabs: {
         availableUnits: Boolean(managerTabAvailableUnitsEl?.checked),
         activeTenants: Boolean(managerTabActiveTenantsEl?.checked),
-        leaseStatus: Boolean(managerTabLeaseStatusEl?.checked)
+        leaseStatus: Boolean(managerTabLeaseStatusEl?.checked),
+        maintenance: Boolean(managerTabMaintenanceEl?.checked),
+        serviceProviders: Boolean(managerTabServiceProvidersEl?.checked)
       },
       cards: {
         tenantEdit: Boolean(managerAccessTenantEditEl?.checked),
-        tenantAdd: Boolean(managerAccessTenantAddEl?.checked)
+        tenantAdd: Boolean(managerAccessTenantAddEl?.checked),
+        unitEdit: Boolean(managerAccessUnitEditEl?.checked),
+        unitAdd: Boolean(managerAccessUnitAddEl?.checked),
+        maintenanceAdd: Boolean(managerAccessMaintenanceAddEl?.checked),
+        maintenanceEdit: Boolean(managerAccessMaintenanceEditEl?.checked),
+        serviceProviderAdd: Boolean(managerAccessServiceProviderAddEl?.checked),
+        serviceProviderEdit: Boolean(managerAccessServiceProviderEditEl?.checked)
       }
     }
   });
@@ -2137,6 +2733,8 @@ function loadLocalState() {
   } catch {
     state.tenants = [];
     state.units = [];
+    state.maintenanceEntries = [];
+    state.serviceProviders = [];
   }
 }
 
@@ -2216,6 +2814,8 @@ function getSerializedState() {
     activeMonth: state.activeMonth,
     tenants: state.tenants,
     units: state.units,
+    maintenanceEntries: state.maintenanceEntries,
+    serviceProviders: state.serviceProviders,
     accessPins: state.accessPins,
     accessControl: state.accessControl,
     uiTheme: state.uiTheme,
@@ -2247,6 +2847,8 @@ function applyParsedState(parsed) {
         notes: unit.notes || ""
       }))
     : [];
+  state.maintenanceEntries = normalizeMaintenanceEntries(parsed.maintenanceEntries);
+  state.serviceProviders = normalizeServiceProviders(parsed.serviceProviders);
   state.accessPins = normalizeAccessPins(parsed.accessPins);
   state.accessControl = normalizeAccessControl(parsed.accessControl);
   state.uiTheme = normalizeTheme(parsed.uiTheme);
@@ -2297,6 +2899,38 @@ function normalizePayments(payments) {
     };
   });
   return normalized;
+}
+
+function normalizeMaintenanceEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .map((entry) => ({
+      id: entry?.id || crypto.randomUUID(),
+      monthKey: sanitizeMonthKey(entry?.monthKey),
+      buildingName: normalizeUnitText(entry?.buildingName),
+      category: String(entry?.category || "").trim(),
+      amount: Number(entry?.amount || 0),
+      notes: String(entry?.notes || "").trim()
+    }))
+    .filter((entry) => entry.buildingName && entry.category && Number.isFinite(entry.amount) && entry.amount >= 0);
+}
+
+function normalizeServiceProviders(providers) {
+  if (!Array.isArray(providers)) return [];
+  return providers
+    .map((provider) => {
+      const rawMobile = String(provider?.mobile || "").trim();
+      const parsedMobile = rawMobile ? parseIndianMobile(rawMobile) : "";
+      return {
+        id: provider?.id || crypto.randomUUID(),
+        serviceName: normalizeUnitText(provider?.serviceName),
+        technicianName: String(provider?.technicianName || "").trim(),
+        mobile: parsedMobile || "",
+        url: String(provider?.url || "").trim(),
+        notes: String(provider?.notes || "").trim()
+      };
+    })
+    .filter((provider) => provider.serviceName && provider.technicianName);
 }
 
 function getActiveTenantsForMonth(yyyyMm) {
@@ -2733,6 +3367,8 @@ function onEditorLogout() {
   editorPinEl.value = "";
   cancelEditTenant();
   cancelUnitEdit();
+  cancelMaintenanceEdit();
+  cancelServiceProviderEdit();
   activeTenantAddCardEl.classList.add("hidden");
   unitAddCardEl.classList.add("hidden");
   settingsEditMode.propertyAddress = false;
@@ -2769,10 +3405,44 @@ function hasPermission(permission) {
   if (role === "admin") return true;
   if (role === "manager") {
     if (permission === "mark_paid" || permission === "notify_tenant") return true;
+    if (permission === "maintenance_add") {
+      return (
+        Boolean(state.accessControl?.manager?.tabs?.maintenance) &&
+        Boolean(state.accessControl?.manager?.cards?.maintenanceAdd)
+      );
+    }
+    if (permission === "maintenance_edit") {
+      return (
+        Boolean(state.accessControl?.manager?.tabs?.maintenance) &&
+        Boolean(state.accessControl?.manager?.cards?.maintenanceEdit)
+      );
+    }
+    if (permission === "service_provider_add") {
+      return (
+        Boolean(state.accessControl?.manager?.tabs?.serviceProviders) &&
+        Boolean(state.accessControl?.manager?.cards?.serviceProviderAdd)
+      );
+    }
+    if (permission === "service_provider_edit") {
+      return (
+        Boolean(state.accessControl?.manager?.tabs?.serviceProviders) &&
+        Boolean(state.accessControl?.manager?.cards?.serviceProviderEdit)
+      );
+    }
     if (permission === "tenant_edit") return Boolean(state.accessControl?.manager?.cards?.tenantEdit);
-    if (permission === "unit_edit") return false;
+    if (permission === "unit_edit") {
+      return (
+        Boolean(state.accessControl?.manager?.tabs?.availableUnits) &&
+        Boolean(state.accessControl?.manager?.cards?.unitEdit)
+      );
+    }
     if (permission === "tenant_add") return Boolean(state.accessControl?.manager?.cards?.tenantAdd);
-    if (permission === "unit_add") return Boolean(state.accessControl?.manager?.tabs?.availableUnits);
+    if (permission === "unit_add") {
+      return (
+        Boolean(state.accessControl?.manager?.tabs?.availableUnits) &&
+        Boolean(state.accessControl?.manager?.cards?.unitAdd)
+      );
+    }
     return false;
   }
   return false;
@@ -2792,10 +3462,15 @@ function updateEditorStatusUi() {
 
   const canAddTenant = hasPermission("tenant_add");
   const canAddUnit = hasPermission("unit_add");
+  const canAddServiceProvider = hasPermission("service_provider_add");
   addTenantFromActiveEl.classList.toggle("hidden", !canAddTenant);
   addUnitFromUnitsEl.classList.toggle("hidden", !canAddUnit);
+  if (addServiceProviderFromTabEl) {
+    addServiceProviderFromTabEl.classList.toggle("hidden", !canAddServiceProvider);
+  }
   if (!canAddTenant) activeTenantAddCardEl.classList.add("hidden");
   if (!canAddUnit) unitAddCardEl.classList.add("hidden");
+  if (!canAddServiceProvider && serviceProviderAddCardEl) serviceProviderAddCardEl.classList.add("hidden");
 }
 
 function applyAnonymousVisibility() {
@@ -2840,6 +3515,8 @@ function applyAnonymousVisibility() {
   activeTenantAddCardEl.classList.add("hidden");
   activeTenantEditCardEl.classList.add("hidden");
   unitAddCardEl.classList.add("hidden");
+  if (maintenanceAddCardEl) maintenanceAddCardEl.classList.add("hidden");
+  if (serviceProviderAddCardEl) serviceProviderAddCardEl.classList.add("hidden");
 }
 
 function setManagerTabVisibility() {
@@ -2847,12 +3524,16 @@ function setManagerTabVisibility() {
   const allowAvailableUnits = Boolean(tabAccess.availableUnits);
   const allowActiveTenants = Boolean(tabAccess.activeTenants);
   const allowLeaseStatus = Boolean(tabAccess.leaseStatus);
+  const allowMaintenance = Boolean(tabAccess.maintenance);
+  const allowServiceProviders = Boolean(tabAccess.serviceProviders);
 
   tabButtons.forEach((button) => {
     const tab = button.dataset.tabTarget;
     if (tab === "available-units") button.classList.toggle("hidden", !allowAvailableUnits);
     if (tab === "active-tenants") button.classList.toggle("hidden", !allowActiveTenants);
     if (tab === "lease-status") button.classList.toggle("hidden", !allowLeaseStatus);
+    if (tab === "maintenance") button.classList.toggle("hidden", !allowMaintenance);
+    if (tab === "service-providers") button.classList.toggle("hidden", !allowServiceProviders);
     if (tab === "settings") button.classList.add("hidden");
   });
 
@@ -2861,6 +3542,8 @@ function setManagerTabVisibility() {
     if (tab === "available-units") panel.classList.toggle("hidden", !allowAvailableUnits);
     if (tab === "active-tenants") panel.classList.toggle("hidden", !allowActiveTenants);
     if (tab === "lease-status") panel.classList.toggle("hidden", !allowLeaseStatus);
+    if (tab === "maintenance") panel.classList.toggle("hidden", !allowMaintenance);
+    if (tab === "service-providers") panel.classList.toggle("hidden", !allowServiceProviders);
     if (tab === "settings") panel.classList.add("hidden");
   });
 }
@@ -3021,11 +3704,19 @@ function normalizeAccessControl(config) {
       tabs: {
         availableUnits: true,
         activeTenants: true,
-        leaseStatus: true
+        leaseStatus: true,
+        maintenance: true,
+        serviceProviders: true
       },
       cards: {
         tenantEdit: false,
-        tenantAdd: false
+        tenantAdd: false,
+        unitEdit: false,
+        unitAdd: true,
+        maintenanceAdd: false,
+        maintenanceEdit: false,
+        serviceProviderAdd: false,
+        serviceProviderEdit: false
       }
     }
   };
@@ -3044,7 +3735,15 @@ function normalizeAccessControl(config) {
         leaseStatus:
           config?.manager?.tabs?.leaseStatus === undefined
             ? defaults.manager.tabs.leaseStatus
-            : Boolean(config.manager.tabs.leaseStatus)
+            : Boolean(config.manager.tabs.leaseStatus),
+        maintenance:
+          config?.manager?.tabs?.maintenance === undefined
+            ? defaults.manager.tabs.maintenance
+            : Boolean(config.manager.tabs.maintenance),
+        serviceProviders:
+          config?.manager?.tabs?.serviceProviders === undefined
+            ? defaults.manager.tabs.serviceProviders
+            : Boolean(config.manager.tabs.serviceProviders)
       },
       cards: {
         tenantEdit:
@@ -3054,7 +3753,31 @@ function normalizeAccessControl(config) {
         tenantAdd:
           config?.manager?.cards?.tenantAdd === undefined
             ? defaults.manager.cards.tenantAdd
-            : Boolean(config.manager.cards.tenantAdd)
+            : Boolean(config.manager.cards.tenantAdd),
+        unitEdit:
+          config?.manager?.cards?.unitEdit === undefined
+            ? defaults.manager.cards.unitEdit
+            : Boolean(config.manager.cards.unitEdit),
+        unitAdd:
+          config?.manager?.cards?.unitAdd === undefined
+            ? defaults.manager.cards.unitAdd
+            : Boolean(config.manager.cards.unitAdd),
+        maintenanceAdd:
+          config?.manager?.cards?.maintenanceAdd === undefined
+            ? defaults.manager.cards.maintenanceAdd
+            : Boolean(config.manager.cards.maintenanceAdd),
+        maintenanceEdit:
+          config?.manager?.cards?.maintenanceEdit === undefined
+            ? defaults.manager.cards.maintenanceEdit
+            : Boolean(config.manager.cards.maintenanceEdit),
+        serviceProviderAdd:
+          config?.manager?.cards?.serviceProviderAdd === undefined
+            ? defaults.manager.cards.serviceProviderAdd
+            : Boolean(config.manager.cards.serviceProviderAdd),
+        serviceProviderEdit:
+          config?.manager?.cards?.serviceProviderEdit === undefined
+            ? defaults.manager.cards.serviceProviderEdit
+            : Boolean(config.manager.cards.serviceProviderEdit)
       }
     }
   };

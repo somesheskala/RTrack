@@ -1195,6 +1195,52 @@ textarea:focus {
   padding: 0.16rem 0.34rem;
 }
 
+.maintenance-card {
+  padding: 0.52rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.64);
+  border-left: 3px solid #7b6652;
+}
+
+.maintenance-card .tenant-card-grid {
+  margin-top: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem 0.5rem;
+}
+
+.maintenance-card .tenant-card-notes {
+  margin-top: 0.28rem;
+  font-size: 0.76rem;
+}
+
+.maintenance-actions {
+  margin-top: 0.3rem;
+  justify-content: flex-end;
+}
+
+.service-provider-card {
+  padding: 0.52rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.64);
+  border-left: 3px solid #7b6652;
+}
+
+.service-provider-card .tenant-card-grid {
+  margin-top: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem 0.5rem;
+}
+
+.service-provider-card .tenant-card-notes {
+  margin-top: 0.28rem;
+  font-size: 0.76rem;
+}
+
+.service-provider-actions {
+  margin-top: 0.3rem;
+  justify-content: flex-end;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: 1fr;
@@ -1417,6 +1463,14 @@ textarea:focus {
   }
 
   #unitAddCard .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .maintenance-card .tenant-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .service-provider-card .tenant-card-grid {
     grid-template-columns: 1fr;
   }
 }
