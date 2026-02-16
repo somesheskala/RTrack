@@ -666,6 +666,13 @@ textarea:focus {
   border-color: #d9ab6d;
 }
 
+.pill.tenant-submitted,
+.pill.manager-review,
+.pill.admin-review {
+  background: #f6d9b1;
+  border-color: #d9ab6d;
+}
+
 .actions {
   display: flex;
   gap: 0.35rem;
@@ -700,6 +707,13 @@ textarea:focus {
 }
 
 .lease-chip.review {
+  background: #f6d9b1;
+  border-color: #d9ab6d;
+}
+
+.lease-chip.tenant-submitted,
+.lease-chip.manager-review,
+.lease-chip.admin-review {
   background: #f6d9b1;
   border-color: #d9ab6d;
 }
@@ -1241,6 +1255,251 @@ textarea:focus {
   justify-content: flex-end;
 }
 
+.tenant-portal-card {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.tenant-portal-layout {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.tenant-portal-flow {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.tenant-portal-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.42rem;
+  border: 1px solid rgba(176, 58, 44, 0.22);
+  border-radius: 12px;
+  padding: 0.58rem;
+  background: linear-gradient(180deg, rgba(255, 244, 241, 0.85), rgba(255, 255, 255, 0.55));
+}
+
+.tenant-portal-panel {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.62rem;
+  border: 1px solid rgba(85, 68, 50, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.tenant-portal-panel h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #2f241b;
+}
+
+.tenant-portal-pay-panel {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 0.65rem;
+}
+
+.tenant-portal-pay-col {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.tenant-portal-timeline > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #35291f;
+}
+
+.tenant-portal-timeline > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tenant-floating-banner {
+  position: sticky;
+  top: 0.35rem;
+  z-index: 20;
+  display: grid;
+  gap: 0.42rem;
+  padding: 0.72rem 0.82rem;
+  border: 2px solid rgba(165, 44, 31, 0.52);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 232, 226, 0.98), rgba(255, 245, 242, 0.96));
+  box-shadow:
+    0 14px 24px rgba(74, 26, 21, 0.22),
+    0 0 0 2px rgba(255, 255, 255, 0.5) inset;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.tenant-floating-banner-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7c2018;
+}
+
+.tenant-floating-banner-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.tenant-floating-banner-chip {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.5rem 0.62rem;
+  border-radius: 10px;
+  border: 1px solid rgba(156, 50, 38, 0.34);
+  background: rgba(255, 255, 255, 0.9);
+  color: #2e1a16;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.tenant-portal-section {
+  display: grid;
+  gap: 0.42rem;
+  padding: 0.62rem;
+  border: 1px solid rgba(85, 68, 50, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.tenant-portal-highlight {
+  border-color: rgba(176, 58, 44, 0.28);
+  background: linear-gradient(180deg, rgba(255, 241, 239, 0.7), rgba(255, 255, 255, 0.42));
+}
+
+.tenant-portal-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.tenant-portal-section-head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #2f241b;
+}
+
+.tenant-portal-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+}
+
+.tenant-portal-kpi {
+  border: 1px solid rgba(89, 69, 51, 0.14);
+  border-radius: 10px;
+  padding: 0.42rem 0.48rem;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.tenant-portal-kpi span {
+  display: block;
+  font-size: 0.72rem;
+  color: #6b5e50;
+}
+
+.tenant-portal-kpi strong {
+  display: block;
+  margin-top: 0.08rem;
+  color: #1e1814;
+  font-size: 0.88rem;
+}
+
+.portal-due-count {
+  color: #9f2d23;
+}
+
+.tenant-portal-actions {
+  justify-content: flex-end;
+}
+
+.tenant-issue-box {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(85, 68, 50, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.34);
+}
+
+#tenantPaymentMethodSelect,
+#tenantPaidMonth,
+#tenantPaidAmount,
+#tenantIssueMessage {
+  width: 100%;
+}
+
+.message-board-form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.message-board-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.message-board-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.message-board-item {
+  border: 1px solid rgba(83, 64, 46, 0.16);
+  border-radius: 10px;
+  padding: 0.5rem 0.58rem;
+  background: rgba(255, 255, 255, 0.58);
+  margin-top: 0.45rem;
+}
+
+.message-board-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.message-board-head strong {
+  font-size: 0.84rem;
+  color: #221a14;
+}
+
+.message-board-head span {
+  font-size: 0.72rem;
+  color: #665849;
+}
+
+.message-board-item p {
+  margin: 0.25rem 0 0;
+  color: #30241b;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
+.message-board-item small {
+  display: block;
+  margin-top: 0.3rem;
+  color: #6b5d4d;
+  font-size: 0.72rem;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: 1fr;
@@ -1471,6 +1730,18 @@ textarea:focus {
   }
 
   .service-provider-card .tenant-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tenant-portal-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tenant-portal-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tenant-portal-pay-panel {
     grid-template-columns: 1fr;
   }
 }

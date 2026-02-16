@@ -77,6 +77,7 @@ const {
 
 const STORAGE_KEY = "rental-manager-data-v1";
 const EDIT_ACCESS_KEY = "rental-manager-edit-access-v1";
+const TENANT_ACCESS_KEY = "rental-manager-tenant-access-v1";
 const REMOTE_FALLBACK_WARNED_KEY = "rental-manager-remote-fallback-warned";
 const LOCAL_DOC_TOTAL_LIMIT_BYTES = 3 * 1024 * 1024;
 const LOCAL_DOC_SINGLE_FILE_LIMIT_BYTES = 700 * 1024;
@@ -93,6 +94,8 @@ const state = {
   activeMonth: getCurrentMonth(),
   tenants: [],
   units: [],
+  messageBoard: [],
+  announcementsEnabled: true,
   maintenanceEntries: [],
   serviceProviders: [],
   accessPins: {
@@ -131,7 +134,8 @@ const state = {
     senderName: "Rental Management",
     reviewSubjectTemplate: "Payment Review Required: {unit} {tenant name}",
     buildingAddresses: {},
-    buildingLandlords: {}
+    buildingLandlords: {},
+    buildingPaymentOptions: {}
   }
 };
 
@@ -167,6 +171,13 @@ const unitBuildingSummaryEl = document.getElementById("unitBuildingSummary");
 const propertyNameSelectEl = document.getElementById("propertyName");
 const editPropertyNameSelectEl = document.getElementById("editPropertyName");
 const dashboardTenantGroupsEl = document.getElementById("dashboardTenantGroups");
+const messageBoardFormEl = document.getElementById("messageBoardForm");
+const messageBoardTextEl = document.getElementById("messageBoardText");
+const announcementToggleBtnEl = document.getElementById("announcementToggleBtn");
+const messageBoardPostBtnEl = document.getElementById("messageBoardPostBtn");
+const messageBoardListEl = document.getElementById("messageBoardList");
+const messageBoardComposeFieldEl = document.getElementById("messageBoardComposeField");
+const messageBoardPostActionsEl = document.getElementById("messageBoardPostActions");
 const expandDashboardTenantsEl = document.getElementById("expandDashboardTenants");
 const collapseDashboardTenantsEl = document.getElementById("collapseDashboardTenants");
 const leaseStatusGroupsEl = document.getElementById("leaseStatusGroups");
@@ -210,11 +221,16 @@ const emailjsTemplateIdEl = document.getElementById("emailjsTemplateId");
 const notifySenderNameEl = document.getElementById("notifySenderName");
 const reviewSubjectTemplateEl = document.getElementById("reviewSubjectTemplate");
 const buildingAddressFieldsEl = document.getElementById("buildingAddressFields");
+const buildingPaymentFieldsEl = document.getElementById("buildingPaymentFields");
 const propertyAddressSectionEl = document.getElementById("propertyAddressSection");
+const paymentOptionsSectionEl = document.getElementById("paymentOptionsSection");
 const mailConfigSectionEl = document.getElementById("mailConfigSection");
 const editPropertyAddressBtnEl = document.getElementById("editPropertyAddressBtn");
 const savePropertyAddressBtnEl = document.getElementById("savePropertyAddressBtn");
 const cancelPropertyAddressBtnEl = document.getElementById("cancelPropertyAddressBtn");
+const editPaymentOptionsBtnEl = document.getElementById("editPaymentOptionsBtn");
+const savePaymentOptionsBtnEl = document.getElementById("savePaymentOptionsBtn");
+const cancelPaymentOptionsBtnEl = document.getElementById("cancelPaymentOptionsBtn");
 const editMailConfigBtnEl = document.getElementById("editMailConfigBtn");
 const saveMailConfigBtnEl = document.getElementById("saveMailConfigBtn");
 const cancelMailConfigBtnEl = document.getElementById("cancelMailConfigBtn");
@@ -250,6 +266,10 @@ const cancelThemeBtnEl = document.getElementById("cancelThemeBtn");
 const appThemeSelectEl = document.getElementById("appThemeSelect");
 const exportMonthlyReportBtnEl = document.getElementById("exportMonthlyReport");
 const tenantForm = document.getElementById("tenant-form");
+const tenantPinEl = document.getElementById("tenantPin");
+const editTenantPinEl = document.getElementById("editTenantPin");
+const showTenantPinEl = document.getElementById("showTenantPin");
+const showEditTenantPinEl = document.getElementById("showEditTenantPin");
 const activeMonthInput = document.getElementById("activeMonth");
 const tabsContainerEl = document.querySelector(".tabs");
 const dashboardPanelEl = document.querySelector('[data-tab-panel="dashboard"]');
@@ -264,21 +284,26 @@ const editorAccessFormEl = document.getElementById("editor-access-form");
 const editorUserLegacyEl = document.getElementById("editorUser");
 const editorPinEl = document.getElementById("editorPin");
 const editorLoginBtnEl = document.getElementById("editorLoginBtn");
+const tenantLoginBtnEl = document.getElementById("tenantLoginBtn");
 const editorLogoutEl = document.getElementById("editorLogout");
 const editorStatusEl = document.getElementById("editorStatus");
 const manualRefreshBtnEl = document.getElementById("manualRefreshBtn");
+const tenantPortalPanelEl = document.getElementById("tenantPortalPanel");
+const tenantPortalCardEl = document.getElementById("tenantPortalCard");
 let editingTenantId = "";
 let editingUnitId = "";
 let editingMaintenanceId = "";
 let editingServiceProviderId = "";
 let editDocKeysToDelete = new Set();
 let editorUser = "";
+let tenantSessionTenantId = "";
 let supabaseClient = null;
 let remoteEnabled = false;
 let sharedStateRowId = "shared";
 let supabaseDocBucket = DEFAULT_SUPABASE_DOC_BUCKET;
 const settingsEditMode = {
   propertyAddress: false,
+  paymentOptions: false,
   mailConfig: false,
   accessControl: false,
   accessPins: false,
@@ -304,11 +329,14 @@ async function init() {
   });
   activeTenantEditFormEl.addEventListener("submit", onEditTenant);
   cancelTenantEditEl.addEventListener("click", cancelEditTenant);
+  bindPinVisibilityToggle(showTenantPinEl, tenantPinEl);
+  bindPinVisibilityToggle(showEditTenantPinEl, editTenantPinEl);
   if (editExistingDocsEl) {
     editExistingDocsEl.addEventListener("click", onEditExistingDocAction);
   }
   cancelAddTenantEl.addEventListener("click", () => {
     tenantForm.reset();
+    setPinMasked(showTenantPinEl, tenantPinEl);
     activeTenantAddCardEl.classList.add("hidden");
   });
   addTenantFromActiveEl.addEventListener("click", () => {
@@ -405,6 +433,18 @@ async function init() {
   if (savePropertyAddressBtnEl) {
     savePropertyAddressBtnEl.addEventListener("click", savePropertyAddressConfig);
   }
+  if (editPaymentOptionsBtnEl) {
+    editPaymentOptionsBtnEl.addEventListener("click", () => setSettingsSectionMode("paymentOptions", true));
+  }
+  if (cancelPaymentOptionsBtnEl) {
+    cancelPaymentOptionsBtnEl.addEventListener("click", () => {
+      setSettingsSectionMode("paymentOptions", false);
+      renderNotifyConfig();
+    });
+  }
+  if (savePaymentOptionsBtnEl) {
+    savePaymentOptionsBtnEl.addEventListener("click", savePaymentOptionsConfig);
+  }
   if (editMailConfigBtnEl) {
     editMailConfigBtnEl.addEventListener("click", () => setSettingsSectionMode("mailConfig", true));
   }
@@ -459,6 +499,12 @@ async function init() {
   if (exportMonthlyReportBtnEl) {
     exportMonthlyReportBtnEl.addEventListener("click", exportMonthlyReportPdf);
   }
+  if (messageBoardFormEl) {
+    messageBoardFormEl.addEventListener("submit", onPostMessageBoard);
+  }
+  if (announcementToggleBtnEl) {
+    announcementToggleBtnEl.addEventListener("click", onToggleAnnouncements);
+  }
   if (expandDashboardTenantsEl) {
     expandDashboardTenantsEl.addEventListener("click", () => setAllDashboardTenantGroups(true));
   }
@@ -486,6 +532,19 @@ async function init() {
   });
 }
 
+function bindPinVisibilityToggle(toggleEl, pinInputEl) {
+  if (!toggleEl || !pinInputEl) return;
+  toggleEl.addEventListener("change", () => {
+    pinInputEl.type = toggleEl.checked ? "text" : "password";
+  });
+}
+
+function setPinMasked(toggleEl, pinInputEl) {
+  if (!pinInputEl) return;
+  pinInputEl.type = "password";
+  if (toggleEl) toggleEl.checked = false;
+}
+
 async function onAddTenant(event) {
   event.preventDefault();
   if (!hasPermission("tenant_add")) {
@@ -497,6 +556,7 @@ async function onAddTenant(event) {
   const documentFiles = document.getElementById("tenantDocuments").files;
   const linkedUnitId = propertyNameSelectEl.value;
   const parsedMobile = parseIndianMobile(document.getElementById("tenantMobile").value);
+  const tenantPin = normalizeTenantPin(tenantPinEl?.value || "");
 
   if (new Date(leaseStart) > new Date(leaseEnd)) {
     alert("Lease start date cannot be after lease end date.");
@@ -508,6 +568,14 @@ async function onAddTenant(event) {
   }
   if (parsedMobile === null) {
     alert("Enter a valid Indian mobile number (10 digits, optionally with +91).");
+    return;
+  }
+  if (!tenantPin) {
+    alert("Tenant PIN must be numeric and 4 to 8 digits.");
+    return;
+  }
+  if (getTenantByPin(tenantPin)) {
+    alert("This tenant PIN is already assigned to another tenant.");
     return;
   }
   const conflictingTenant = findConflictingTenantForUnit(linkedUnitId, leaseStart, leaseEnd);
@@ -546,6 +614,7 @@ async function onAddTenant(event) {
     leaseEnd,
     deposit: Number(document.getElementById("deposit").value || 0),
     notes: document.getElementById("tenantNotes").value.trim(),
+    tenantPin,
     documents,
     linkedUnitId,
     payments: {}
@@ -554,6 +623,7 @@ async function onAddTenant(event) {
   state.tenants.push(tenant);
   syncUnitFromTenant(tenant, "");
   tenantForm.reset();
+  setPinMasked(showTenantPinEl, tenantPinEl);
   saveState();
   renderAll();
 }
@@ -565,10 +635,12 @@ function renderAll() {
   try {
     renderActiveTenantsToday();
     renderRows();
+    renderMessageBoard();
     renderLeaseStatusRows();
     renderUnits();
     renderMaintenanceRows();
     renderServiceProviders();
+    renderTenantPortal();
     renderNotifyConfig();
     renderTenantNameOptions();
     renderPropertyNameOptions();
@@ -829,6 +901,117 @@ function renderMetrics() {
   metricsEl.dataset.appRendered = "1";
 }
 
+function onPostMessageBoard(event) {
+  event.preventDefault();
+  if (!hasPermission("message_post")) {
+    alert("Only manager or admin can post messages.");
+    return;
+  }
+  const message = String(messageBoardTextEl?.value || "").trim();
+  if (!message) {
+    alert("Enter message text.");
+    return;
+  }
+  const role = getCurrentRole();
+  state.messageBoard = [{
+    id: crypto.randomUUID(),
+    title: "Announcement",
+    message: message.slice(0, 1000),
+    postedBy: role === "admin" ? "Admin" : "Manager",
+    postedAt: new Date().toISOString()
+  }];
+  saveState();
+  renderAll();
+  if (messageBoardFormEl) messageBoardFormEl.reset();
+}
+
+function onToggleAnnouncements() {
+  if (!hasPermission("message_post")) {
+    alert("Only manager or admin can change announcements mode.");
+    return;
+  }
+  state.announcementsEnabled = !Boolean(state.announcementsEnabled);
+  state.messageBoard = [];
+  if (messageBoardTextEl) messageBoardTextEl.value = "";
+  saveState();
+  renderAll();
+}
+
+function renderMessageBoard() {
+  if (!messageBoardListEl) return;
+  const entries = getSortedMessageBoardEntries();
+  const canPost = hasPermission("message_post");
+  if (messageBoardFormEl) {
+    messageBoardFormEl.classList.toggle("hidden", !canPost);
+  }
+  const composeVisible = canPost && Boolean(state.announcementsEnabled);
+  if (messageBoardComposeFieldEl) {
+    messageBoardComposeFieldEl.classList.toggle("hidden", !composeVisible);
+    messageBoardComposeFieldEl.style.display = composeVisible ? "" : "none";
+  }
+  if (messageBoardPostActionsEl) {
+    messageBoardPostActionsEl.classList.toggle("hidden", !composeVisible);
+    messageBoardPostActionsEl.style.display = composeVisible ? "" : "none";
+  }
+  if (messageBoardTextEl) {
+    messageBoardTextEl.disabled = !composeVisible;
+  }
+  if (announcementToggleBtnEl) {
+    announcementToggleBtnEl.disabled = !canPost;
+    announcementToggleBtnEl.textContent = state.announcementsEnabled ? "Disable Announcements" : "Enable Announcements";
+  }
+  if (messageBoardPostBtnEl) {
+    messageBoardPostBtnEl.disabled = !composeVisible;
+  }
+  if (!state.announcementsEnabled) {
+    messageBoardListEl.innerHTML = '<div class="empty-note">Announcements are disabled.</div>';
+    return;
+  }
+  if (!entries.length) {
+    messageBoardListEl.innerHTML = '<div class="empty-note">No announcements yet.</div>';
+    return;
+  }
+  messageBoardListEl.innerHTML = entries
+    .map(
+      (entry) => `
+      <article class="message-board-item">
+        <div class="message-board-head">
+          <strong>${escapeHtml(entry.title || "General Notice")}</strong>
+          <span>${escapeHtml(formatMessageDate(entry.postedAt))}</span>
+        </div>
+        <p>${escapeHtml(entry.message || "")}</p>
+        <small>Posted by ${escapeHtml(entry.postedBy || "Admin")}</small>
+      </article>
+    `
+    )
+    .join("");
+}
+
+function getSortedMessageBoardEntries() {
+  return normalizeMessageBoardEntries(state.messageBoard)
+    .slice()
+    .sort((a, b) => String(b.postedAt || "").localeCompare(String(a.postedAt || "")));
+}
+
+function getTenantBannerAnnouncement() {
+  if (!state.announcementsEnabled) return null;
+  return getSortedMessageBoardEntries()[0] || null;
+}
+
+function formatMessageDate(isoDate) {
+  const value = String(isoDate || "").trim();
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 function renderRows() {
   const openDashboardGroups = new Set(
     Array.from(dashboardTenantGroupsEl.querySelectorAll(".dashboard-group[open]"))
@@ -874,6 +1057,13 @@ function renderRows() {
         .forEach((tenant) => {
           const payment = tenant.payments[safeMonth] || { status: "due", paidDate: "" };
           const paymentStatus = getPaymentStatus(tenant, safeMonth);
+          const statusClass = getPaymentStatusClass(paymentStatus);
+          const paidDateText =
+            paymentStatus === "paid" && payment.paidDate
+              ? formatDate(payment.paidDate)
+              : payment.submittedDate
+                ? formatDate(payment.submittedDate)
+                : "-";
           const card = document.createElement("article");
           card.className = "tenant-card payment-card";
           card.innerHTML = `
@@ -890,8 +1080,8 @@ function renderRows() {
             </div>
             <div class="payment-summary-row">
               <div class="payment-summary-item"><span>Rent</span><strong>${money(tenant.monthlyRent)}</strong></div>
-              <div class="payment-summary-item"><span>Paid Date</span><strong class="payment-date-inline">${paymentStatus === "paid" && payment.paidDate ? formatDate(payment.paidDate) : "-"}</strong></div>
-              <div class="payment-summary-item"><span>Status</span><strong><span class="pill ${paymentStatus}">${formatPaymentStatus(paymentStatus)}</span></strong></div>
+              <div class="payment-summary-item"><span>Date</span><strong class="payment-date-inline">${paidDateText}</strong></div>
+              <div class="payment-summary-item"><span>Status</span><strong><span class="pill ${statusClass}">${formatPaymentStatus(paymentStatus)}</span></strong></div>
             </div>
           `;
 
@@ -899,16 +1089,26 @@ function renderRows() {
           actionsCell.className = "actions";
           const rightCell = card.querySelector(".tenant-card-right");
 
+          const role = getCurrentRole();
           if (hasPermission("mark_paid") && paymentStatus !== "paid") {
-            const markPaidBtn = document.createElement("button");
-            markPaidBtn.type = "button";
-            markPaidBtn.className = "btn btn-small mark-paid";
-            markPaidBtn.textContent = "Mark Paid";
-            markPaidBtn.addEventListener("click", () => markPaid(tenant.id));
-            actionsCell.appendChild(markPaidBtn);
+            if (role === "manager" && paymentStatus === "tenant_submitted") {
+              const managerReviewBtn = document.createElement("button");
+              managerReviewBtn.type = "button";
+              managerReviewBtn.className = "btn btn-small mark-paid";
+              managerReviewBtn.textContent = "Manager Review";
+              managerReviewBtn.addEventListener("click", () => markPaid(tenant.id));
+              actionsCell.appendChild(managerReviewBtn);
+            } else if (role === "admin") {
+              const adminMarkPaidBtn = document.createElement("button");
+              adminMarkPaidBtn.type = "button";
+              adminMarkPaidBtn.className = "btn btn-small mark-paid";
+              adminMarkPaidBtn.textContent = "Mark Paid";
+              adminMarkPaidBtn.addEventListener("click", () => markPaid(tenant.id));
+              actionsCell.appendChild(adminMarkPaidBtn);
+            }
           }
 
-          if (hasPermission("mark_unpaid") && paymentStatus === "paid") {
+          if (role === "admin" && hasPermission("mark_unpaid") && paymentStatus !== "due") {
             const markUnpaidBtn = document.createElement("button");
             markUnpaidBtn.type = "button";
             markUnpaidBtn.className = "btn btn-small btn-muted mark-unpaid";
@@ -917,7 +1117,7 @@ function renderRows() {
             actionsCell.appendChild(markUnpaidBtn);
           }
 
-          if (hasPermission("notify_tenant") && paymentStatus !== "paid") {
+          if (hasPermission("notify_tenant") && paymentStatus === "due") {
             const notifyBtn = document.createElement("button");
             notifyBtn.type = "button";
             notifyBtn.className = "btn btn-small";
@@ -1193,13 +1393,8 @@ function renderLeaseStatusRows() {
           const statusChips = getLeaseMonths(tenant.leaseStart, tenant.leaseEnd)
             .map((monthKey) => {
               const paymentStatus = getPaymentStatus(tenant, monthKey);
-              if (paymentStatus === "paid") {
-                return `<span class="lease-chip paid">${formatMonthShort(monthKey)}: Paid</span>`;
-              }
-              if (monthKey > currentMonthKey) {
-                return `<span class="lease-chip future">${formatMonthShort(monthKey)}: Future</span>`;
-              }
-              return `<span class="lease-chip due">${formatMonthShort(monthKey)}: Due</span>`;
+              const chip = getLeaseChipMeta(monthKey, paymentStatus, currentMonthKey);
+              return `<span class="lease-chip ${chip.className}">${formatMonthShort(monthKey)}: ${chip.label}</span>`;
             })
             .join("");
 
@@ -1242,20 +1437,25 @@ function markPaid(tenantId) {
   const role = getCurrentRole();
   const existing = tenant.payments[state.activeMonth] || { status: "due", paidDate: "" };
   const today = new Date().toISOString().slice(0, 10);
+  const currentStatus = getPaymentStatus(tenant, state.activeMonth);
 
   if (role === "manager") {
-    if (getPaymentStatus(tenant, state.activeMonth) === "paid") {
+    if (currentStatus === "paid") {
       alert("This payment is already verified and marked as paid.");
+      return;
+    }
+    if (currentStatus !== "tenant_submitted") {
+      alert("Tenant must submit payment first before manager review.");
       return;
     }
     tenant.payments[state.activeMonth] = {
       ...existing,
-      status: "review",
-      reviewDate: today,
+      status: "manager_review",
+      managerReviewDate: today,
       paid: false
     };
     notifyAdminsForReview(tenant, state.activeMonth).catch(() => {
-      alert("Payment marked as Review, but failed to send admin review email.");
+      alert("Payment moved to Manager Review, but failed to send admin notification email.");
     });
   } else {
     tenant.payments[state.activeMonth] = {
@@ -1277,7 +1477,14 @@ function markUnpaid(tenantId) {
   const tenant = state.tenants.find((entry) => entry.id === tenantId);
   if (!tenant) return;
   if (!isTenantActiveForMonth(tenant, state.activeMonth)) return;
-  tenant.payments[state.activeMonth] = { status: "due", paid: false, paidDate: "" };
+  tenant.payments[state.activeMonth] = {
+    status: "due",
+    paid: false,
+    paidDate: "",
+    submittedDate: "",
+    submittedAmount: 0,
+    managerReviewDate: ""
+  };
   saveState();
   renderAll();
 }
@@ -2061,6 +2268,339 @@ function setAllServiceProviderGroups(isOpen) {
   });
 }
 
+function renderTenantPortal() {
+  if (!tenantPortalCardEl) return;
+  const tenant = getCurrentTenantSessionRecord();
+  if (!tenant) {
+    tenantPortalCardEl.innerHTML = `
+      <h2>Tenant Portal</h2>
+      <p>Please login with your tenant PIN to view your lease and payment details.</p>
+    `;
+    return;
+  }
+
+  const months = getLeaseMonths(tenant.leaseStart, tenant.leaseEnd);
+  const currentMonth = getCurrentMonth();
+  const isCurrentMonthInLease = months.includes(currentMonth);
+  const statusChips = months
+    .map((monthKey) => {
+      const paymentStatus = getPaymentStatus(tenant, monthKey);
+      const chip = getLeaseChipMeta(monthKey, paymentStatus, currentMonth);
+      return `<span class="lease-chip ${chip.className}">${formatMonthShort(monthKey)}: ${chip.label}</span>`;
+    })
+    .join("");
+
+  const dueActionMonths = months.filter((monthKey) => monthKey <= currentMonth && getPaymentStatus(tenant, monthKey) !== "paid");
+  const nextDueMonth = dueActionMonths[0] || "";
+  const upcomingText = nextDueMonth
+    ? `${formatMonth(nextDueMonth)} (${formatPaymentStatus(getPaymentStatus(tenant, nextDueMonth))})`
+    : "No due payment as of current month";
+  const buildingName = getTenantBuildingName(tenant);
+  const paymentDetails = getBuildingPaymentDetails(buildingName);
+  const paymentMethods = [];
+  if (paymentDetails?.paymentLink) {
+    paymentMethods.push({
+      key: "payment_link",
+      label: "Payment Link",
+      detailHtml: `<div><span>Payment Link</span><strong><a class="doc-link" href="${escapeHtml(
+        paymentDetails.paymentLink
+      )}" target="_blank" rel="noopener noreferrer">${escapeHtml(paymentDetails.paymentLink)}</a></strong></div>`
+    });
+  }
+  if (paymentDetails?.upiId) {
+    paymentMethods.push({
+      key: "upi",
+      label: "UPI",
+      detailHtml: `<div><span>UPI ID</span><strong>${escapeHtml(paymentDetails.upiId)}</strong></div>`
+    });
+  }
+  if (paymentDetails?.phonePeNumber) {
+    paymentMethods.push({
+      key: "phonepe",
+      label: "PhonePe",
+      detailHtml: `<div><span>PhonePe Number</span><strong>${escapeHtml(paymentDetails.phonePeNumber)}</strong></div>`
+    });
+  }
+  if (
+    paymentDetails?.bankAccountHolder ||
+    paymentDetails?.bankAccountNumber ||
+    paymentDetails?.bankIfsc ||
+    paymentDetails?.bankName
+  ) {
+    paymentMethods.push({
+      key: "bank",
+      label: "Bank Transfer",
+      detailHtml: `
+        <div><span>Bank Account Holder</span><strong>${paymentDetails.bankAccountHolder ? escapeHtml(paymentDetails.bankAccountHolder) : "-"}</strong></div>
+        <div><span>Bank Account Number</span><strong>${paymentDetails.bankAccountNumber ? escapeHtml(paymentDetails.bankAccountNumber) : "-"}</strong></div>
+        <div><span>IFSC</span><strong>${paymentDetails.bankIfsc ? escapeHtml(paymentDetails.bankIfsc) : "-"}</strong></div>
+        <div><span>Bank Name</span><strong>${paymentDetails.bankName ? escapeHtml(paymentDetails.bankName) : "-"}</strong></div>
+      `
+    });
+  }
+
+  const paymentMethodDetailsByKey = paymentMethods.reduce((acc, method) => {
+    acc[method.key] = `
+      <div class="tenant-card-grid">${method.detailHtml}</div>
+      ${
+        paymentDetails?.notes
+          ? `<div class="tenant-card-notes"><span>Payment Notes:</span> ${escapeHtml(paymentDetails.notes)}</div>`
+          : ""
+      }
+    `;
+    return acc;
+  }, {});
+  const selectedPaymentMethodKey = paymentMethods[0]?.key || "";
+  const paymentOptionsHtml = paymentMethods.length
+    ? `
+      <label for="tenantPaymentMethodSelect">Select Payment Method</label>
+      <select id="tenantPaymentMethodSelect">
+        ${paymentMethods
+          .map(
+            (method) =>
+              `<option value="${escapeHtml(method.key)}"${method.key === selectedPaymentMethodKey ? " selected" : ""}>${escapeHtml(
+                method.label
+              )}</option>`
+          )
+          .join("")}
+      </select>
+      <div id="tenantPaymentMethodDetails"></div>
+    `
+    : `<div class="empty-note">Payment options are not configured for ${escapeHtml(buildingName)}.</div>`;
+  const selectedPendingMonth = nextDueMonth || "";
+  const dueMonthsCount = dueActionMonths.length;
+  const currentStatus = isCurrentMonthInLease ? getPaymentStatus(tenant, currentMonth) : currentMonth < (months[0] || "") ? "future" : "ended";
+  const currentStatusLabel =
+    currentStatus === "future" ? "Future Lease" : currentStatus === "ended" ? "Lease Ended" : formatPaymentStatus(currentStatus);
+  const currentStatusClass =
+    currentStatus === "future" ? "future" : currentStatus === "ended" ? "due" : getPaymentStatusClass(currentStatus);
+  const nextActionText = selectedPendingMonth
+    ? `Mark payment for ${formatMonth(selectedPendingMonth)} below.`
+    : "No current or previous dues to mark.";
+  const latestTenantAnnouncement = getTenantBannerAnnouncement();
+  const tenantBannerHtml = latestTenantAnnouncement
+    ? `
+      <div class="tenant-floating-banner" role="status" aria-live="polite">
+        <div class="tenant-floating-banner-title">Latest Announcement</div>
+        <div class="tenant-floating-banner-track">
+          <span class="tenant-floating-banner-chip">${escapeHtml(latestTenantAnnouncement.message || "")}</span>
+        </div>
+      </div>
+    `
+    : "";
+
+  tenantPortalCardEl.innerHTML = `
+    <h2>Tenant Portal</h2>
+    ${tenantBannerHtml}
+    <div class="tenant-portal-flow">
+      <section class="tenant-portal-summary">
+        <div class="tenant-portal-kpi">
+          <span>Status</span>
+          <strong><span class="pill ${currentStatusClass}">${escapeHtml(currentStatusLabel)}</span></strong>
+        </div>
+        <div class="tenant-portal-kpi">
+          <span>Due Months</span>
+          <strong class="${dueMonthsCount > 0 ? "portal-due-count" : ""}">${dueMonthsCount}</strong>
+        </div>
+        <div class="tenant-portal-kpi">
+          <span>Next Due</span>
+          <strong>${escapeHtml(upcomingText)}</strong>
+        </div>
+        <div class="tenant-portal-kpi">
+          <span>Monthly Rent</span>
+          <strong>${money(tenant.monthlyRent)}</strong>
+        </div>
+      </section>
+
+      <section class="tenant-portal-panel">
+        <h3>Lease & Unit</h3>
+        <div class="tenant-card-grid">
+          <div><span>Tenant</span><strong>${escapeHtml(tenant.tenantName || "-")}</strong></div>
+          <div><span>Property Unit</span><strong>${escapeHtml(getTenantPropertyName(tenant))}</strong></div>
+          <div><span>Lease</span><strong>${formatDate(tenant.leaseStart)} to ${formatDate(tenant.leaseEnd)}</strong></div>
+          <div><span>Security Deposit</span><strong>${money(tenant.deposit || 0)}</strong></div>
+          <div><span>Next Action</span><strong>${escapeHtml(nextActionText)}</strong></div>
+        </div>
+      </section>
+
+      <section class="tenant-portal-panel tenant-portal-pay-panel">
+        <div class="tenant-portal-pay-col">
+          <h3>Payment Method</h3>
+          ${paymentOptionsHtml}
+        </div>
+        <div class="tenant-portal-pay-col">
+          <h3>Mark Payment</h3>
+          <div class="tenant-card-grid">
+            <label>
+              Month
+              <select id="tenantPaidMonth">
+                ${
+                  dueActionMonths.length
+                    ? dueActionMonths
+                        .map(
+                          (monthKey) =>
+                            `<option value="${monthKey}"${monthKey === selectedPendingMonth ? " selected" : ""}>${escapeHtml(
+                              formatMonth(monthKey)
+                            )}</option>`
+                        )
+                        .join("")
+                    : '<option value="">No pending months</option>'
+                }
+              </select>
+            </label>
+            <label>
+              Rent Amount (₹)
+              <input type="number" id="tenantPaidAmount" min="0" step="0.01" value="${Number(tenant.monthlyRent || 0)}" />
+            </label>
+          </div>
+          <div class="actions tenant-portal-actions">
+            <button type="button" class="btn btn-small" id="tenantMarkPaidBtn"${dueActionMonths.length ? "" : " disabled"}>Submit Paid Request</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tenant-portal-panel">
+        <h3>Need Help?</h3>
+        <label for="tenantIssueMessage">Send message to manager</label>
+        <textarea id="tenantIssueMessage" rows="3" placeholder="Type your message here..."></textarea>
+        <div class="actions">
+          <button type="button" class="btn btn-small" id="tenantIssueSendBtn">Send Message</button>
+        </div>
+      </section>
+
+      <details class="tenant-portal-panel tenant-portal-timeline">
+        <summary>Payment Timeline</summary>
+        <div class="tenant-card-notes"><div class="lease-chip-wrap">${statusChips}</div></div>
+      </details>
+    </div>
+  `;
+
+  const paymentMethodSelectEl = document.getElementById("tenantPaymentMethodSelect");
+  const paymentMethodDetailsEl = document.getElementById("tenantPaymentMethodDetails");
+  const renderSelectedPaymentMethodDetails = () => {
+    if (!paymentMethodSelectEl || !paymentMethodDetailsEl) return;
+    const selectedKey = String(paymentMethodSelectEl.value || "");
+    paymentMethodDetailsEl.innerHTML = paymentMethodDetailsByKey[selectedKey] || "";
+  };
+  if (paymentMethodSelectEl && paymentMethodDetailsEl) {
+    renderSelectedPaymentMethodDetails();
+    paymentMethodSelectEl.addEventListener("change", renderSelectedPaymentMethodDetails);
+  }
+
+  const tenantMarkPaidBtnEl = document.getElementById("tenantMarkPaidBtn");
+  if (tenantMarkPaidBtnEl) {
+    tenantMarkPaidBtnEl.addEventListener("click", () => {
+      const monthEl = document.getElementById("tenantPaidMonth");
+      const amountEl = document.getElementById("tenantPaidAmount");
+      const monthKey = sanitizeMonthKey(monthEl?.value || "");
+      const amount = Number(amountEl?.value || 0);
+      if (!monthEl?.value) {
+        alert("Select payment month.");
+        return;
+      }
+      if (!months.includes(monthKey)) {
+        alert("Selected month is outside lease duration.");
+        return;
+      }
+      if (getPaymentStatus(tenant, monthKey) === "paid") {
+        alert("Selected month is already paid.");
+        return;
+      }
+      if (!Number.isFinite(amount) || amount <= 0) {
+        alert("Enter a valid rent amount.");
+        return;
+      }
+      if (!tenant.payments || typeof tenant.payments !== "object") tenant.payments = {};
+      const existingPayment = tenant.payments?.[monthKey] || { status: "due", paidDate: "" };
+      const today = new Date().toISOString().slice(0, 10);
+      tenant.payments[monthKey] = {
+        ...existingPayment,
+        status: "tenant_submitted",
+        submittedDate: today,
+        submittedAmount: amount,
+        paid: false,
+        paidDate: ""
+      };
+      saveState();
+      renderAll();
+      notifyManagersFromTenantPortal(
+        tenant,
+        "tenant_paid",
+        monthKey,
+        `Tenant marked payment as done.\nAmount: ${money(amount)}`
+      ).catch(() => {});
+    });
+  }
+  const issueBtn = document.getElementById("tenantIssueSendBtn");
+  if (issueBtn) {
+    issueBtn.addEventListener("click", () => {
+      const messageEl = document.getElementById("tenantIssueMessage");
+      const message = String(messageEl?.value || "").trim();
+      if (!message) {
+        alert("Enter your issue message.");
+        return;
+      }
+      notifyManagersFromTenantPortal(tenant, "issue", nextDueMonth || "", message).then((sent) => {
+        if (sent && messageEl) messageEl.value = "";
+      });
+    });
+  }
+}
+
+function notifyManagersFromTenantPortal(tenant, type, monthKey, issueMessage) {
+  const managerEmails = [...new Set([...(state.notifyConfig.managers || []), ...(state.notifyConfig.admins || [])])];
+  if (!managerEmails.length) {
+    alert("Manager/admin email list is not configured.");
+    return Promise.resolve(false);
+  }
+  if (!isEmailServiceConfigured()) {
+    alert("Email service is not configured. Please contact admin.");
+    return Promise.resolve(false);
+  }
+
+  const subject =
+    type === "tenant_paid"
+      ? `Tenant Payment Submitted: ${getTenantPropertyName(tenant)} - ${tenant.tenantName}`
+      : `Tenant Issue: ${getTenantPropertyName(tenant)} - ${tenant.tenantName}`;
+  const message =
+    type === "tenant_paid"
+      ? `Tenant ${tenant.tenantName} submitted payment for review.\nProperty: ${getTenantPropertyName(tenant)}\nMonth: ${
+          monthKey ? formatMonth(monthKey) : "-"
+        }\n${issueMessage || ""}`
+      : `Tenant ${tenant.tenantName} reported an issue.\nProperty: ${getTenantPropertyName(tenant)}\nMessage: ${issueMessage}`;
+
+  const requests = managerEmails.map((email) =>
+    fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        service_id: state.notifyConfig.emailjsServiceId,
+        template_id: state.notifyConfig.emailjsTemplateId,
+        user_id: state.notifyConfig.emailjsPublicKey,
+        template_params: {
+          to_email: email,
+          to_name: "Manager",
+          cc_emails: "",
+          subject,
+          message
+        }
+      })
+    }).then((response) => {
+      if (!response.ok) throw new Error("Failed to send email");
+    })
+  );
+
+  return Promise.all(requests)
+    .then(() => {
+      alert(type === "tenant_paid" ? "Payment submitted to manager for review." : "Issue message sent to manager.");
+      return true;
+    })
+    .catch(() => {
+      alert("Failed to send message to manager.");
+      return false;
+    });
+}
+
 function notifyTenant(tenant, monthKey) {
   if (!hasPermission("notify_tenant")) {
     alert("You do not have permission to notify tenants.");
@@ -2102,10 +2642,12 @@ function renderNotifyConfig() {
   reviewSubjectTemplateEl.value =
     state.notifyConfig.reviewSubjectTemplate || "Payment Review Required: {unit} {tenant name}";
   renderBuildingAddressFields();
+  renderBuildingPaymentFields();
   renderAccessControlSettings();
   renderAccessPinsSettings();
   renderThemeSettings();
   setSettingsSectionMode("propertyAddress", settingsEditMode.propertyAddress);
+  setSettingsSectionMode("paymentOptions", settingsEditMode.paymentOptions);
   setSettingsSectionMode("mailConfig", settingsEditMode.mailConfig);
   setSettingsSectionMode("accessControl", settingsEditMode.accessControl);
   setSettingsSectionMode("accessPins", settingsEditMode.accessPins);
@@ -2116,6 +2658,8 @@ function setSettingsSectionMode(section, isEditing) {
   const key =
     section === "mailConfig"
       ? "mailConfig"
+      : section === "paymentOptions"
+        ? "paymentOptions"
       : section === "accessControl"
         ? "accessControl"
         : section === "accessPins"
@@ -2131,6 +2675,13 @@ function setSettingsSectionMode(section, isEditing) {
       .querySelectorAll("input, textarea, select")
       .forEach((field) => (field.disabled = !editing));
     toggleSectionButtons(editPropertyAddressBtnEl, savePropertyAddressBtnEl, cancelPropertyAddressBtnEl, editing);
+  }
+
+  if (key === "paymentOptions" && paymentOptionsSectionEl) {
+    paymentOptionsSectionEl
+      .querySelectorAll("input, textarea, select")
+      .forEach((field) => (field.disabled = !editing));
+    toggleSectionButtons(editPaymentOptionsBtnEl, savePaymentOptionsBtnEl, cancelPaymentOptionsBtnEl, editing);
   }
 
   if (key === "mailConfig" && mailConfigSectionEl) {
@@ -2177,6 +2728,18 @@ function savePropertyAddressConfig() {
   setSettingsSectionMode("propertyAddress", false);
   renderNotifyConfig();
   alert("Property address section saved.");
+}
+
+function savePaymentOptionsConfig() {
+  if (!hasPermission("manage_notify_lists")) {
+    alert("You do not have permission to manage payment options.");
+    return;
+  }
+  state.notifyConfig.buildingPaymentOptions = getBuildingPaymentOptionsFromSettings();
+  saveState();
+  setSettingsSectionMode("paymentOptions", false);
+  renderNotifyConfig();
+  alert("Payment options section saved.");
 }
 
 function saveMailConfig() {
@@ -2733,6 +3296,8 @@ function loadLocalState() {
   } catch {
     state.tenants = [];
     state.units = [];
+    state.messageBoard = [];
+    state.announcementsEnabled = true;
     state.maintenanceEntries = [];
     state.serviceProviders = [];
   }
@@ -2814,6 +3379,8 @@ function getSerializedState() {
     activeMonth: state.activeMonth,
     tenants: state.tenants,
     units: state.units,
+    messageBoard: state.messageBoard,
+    announcementsEnabled: state.announcementsEnabled,
     maintenanceEntries: state.maintenanceEntries,
     serviceProviders: state.serviceProviders,
     accessPins: state.accessPins,
@@ -2830,6 +3397,7 @@ function applyParsedState(parsed) {
         propertyName: tenant.propertyName || "",
         email: tenant.email || "",
         mobile: tenant.mobile || "",
+        tenantPin: normalizeTenantPin(tenant.tenantPin),
         deposit: Number(tenant.deposit || 0),
         notes: tenant.notes || "",
         documents: Array.isArray(tenant.documents) ? tenant.documents : [],
@@ -2847,6 +3415,8 @@ function applyParsedState(parsed) {
         notes: unit.notes || ""
       }))
     : [];
+  state.messageBoard = normalizeMessageBoardEntries(parsed.messageBoard);
+  state.announcementsEnabled = parsed?.announcementsEnabled === undefined ? true : Boolean(parsed.announcementsEnabled);
   state.maintenanceEntries = normalizeMaintenanceEntries(parsed.maintenanceEntries);
   state.serviceProviders = normalizeServiceProviders(parsed.serviceProviders);
   state.accessPins = normalizeAccessPins(parsed.accessPins);
@@ -2866,7 +3436,14 @@ function sanitizeMonthKey(value) {
 function getPaymentStatus(tenant, monthKey) {
   const payment = tenant.payments?.[monthKey];
   if (!payment) return "due";
-  if (payment.status === "paid" || payment.status === "review" || payment.status === "due") {
+  if (payment.status === "review") return "admin_review";
+  if (
+    payment.status === "paid" ||
+    payment.status === "admin_review" ||
+    payment.status === "manager_review" ||
+    payment.status === "tenant_submitted" ||
+    payment.status === "due"
+  ) {
     return payment.status;
   }
   return payment.paid ? "paid" : "due";
@@ -2874,8 +3451,24 @@ function getPaymentStatus(tenant, monthKey) {
 
 function formatPaymentStatus(status) {
   if (status === "paid") return "Paid";
-  if (status === "review") return "Review";
+  if (status === "tenant_submitted") return "Submitted";
+  if (status === "manager_review") return "Manager Review";
+  if (status === "admin_review" || status === "review") return "Admin Review";
   return "Due";
+}
+
+function getPaymentStatusClass(status) {
+  if (status === "review") return "admin-review";
+  return String(status || "due").replace(/\s+/g, "-").toLowerCase();
+}
+
+function getLeaseChipMeta(monthKey, paymentStatus, currentMonthKey) {
+  if (paymentStatus === "paid") return { className: "paid", label: "Paid" };
+  if (monthKey > currentMonthKey) return { className: "future", label: "Future" };
+  if (paymentStatus === "tenant_submitted") return { className: "review", label: "Submitted" };
+  if (paymentStatus === "manager_review") return { className: "review", label: "Manager Review" };
+  if (paymentStatus === "admin_review" || paymentStatus === "review") return { className: "review", label: "Admin Review" };
+  return { className: "due", label: "Due" };
 }
 
 function normalizePayments(payments) {
@@ -2886,12 +3479,20 @@ function normalizePayments(payments) {
       normalized[monthKey] = { status: "due", paid: false, paidDate: "" };
       return;
     }
-    const status =
-      payment.status === "paid" || payment.status === "review" || payment.status === "due"
-        ? payment.status
-        : payment.paid
-          ? "paid"
-          : "due";
+    let status = "due";
+    if (
+      payment.status === "paid" ||
+      payment.status === "admin_review" ||
+      payment.status === "manager_review" ||
+      payment.status === "tenant_submitted" ||
+      payment.status === "due"
+    ) {
+      status = payment.status;
+    } else if (payment.status === "review") {
+      status = "admin_review";
+    } else {
+      status = payment.paid ? "paid" : "due";
+    }
     normalized[monthKey] = {
       ...payment,
       status,
@@ -2899,6 +3500,20 @@ function normalizePayments(payments) {
     };
   });
   return normalized;
+}
+
+function normalizeMessageBoardEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .map((entry) => ({
+      id: entry?.id || crypto.randomUUID(),
+      title: String(entry?.title || "").trim().slice(0, 80),
+      message: String(entry?.message || "").trim().slice(0, 1000),
+      postedBy: String(entry?.postedBy || "Admin").trim() || "Admin",
+      postedAt: String(entry?.postedAt || new Date().toISOString()).trim()
+    }))
+    .filter((entry) => entry.message)
+    .slice(0, 100);
 }
 
 function normalizeMaintenanceEntries(entries) {
@@ -3110,6 +3725,8 @@ function startEditTenant(tenantId) {
   editDocKeysToDelete = new Set();
   editPropertyNameSelectEl.value = tenant.linkedUnitId || "";
   document.getElementById("editTenantName").value = tenant.tenantName;
+  editTenantPinEl.value = tenant.tenantPin || "";
+  setPinMasked(showEditTenantPinEl, editTenantPinEl);
   document.getElementById("editTenantEmail").value = tenant.email || "";
   document.getElementById("editTenantMobile").value = tenant.mobile || "";
   document.getElementById("editMonthlyRent").value = tenant.monthlyRent;
@@ -3141,6 +3758,7 @@ async function onEditTenant(event) {
   const leaseEnd = document.getElementById("editLeaseEnd").value;
   const linkedUnitId = editPropertyNameSelectEl.value;
   const parsedMobile = parseIndianMobile(document.getElementById("editTenantMobile").value);
+  const tenantPin = normalizeTenantPin(editTenantPinEl?.value || "");
   if (new Date(leaseStart) > new Date(leaseEnd)) {
     alert("Lease start date cannot be after lease end date.");
     return;
@@ -3151,6 +3769,14 @@ async function onEditTenant(event) {
   }
   if (parsedMobile === null) {
     alert("Enter a valid Indian mobile number (10 digits, optionally with +91).");
+    return;
+  }
+  if (!tenantPin) {
+    alert("Tenant PIN must be numeric and 4 to 8 digits.");
+    return;
+  }
+  if (getTenantByPin(tenantPin, tenant.id)) {
+    alert("This tenant PIN is already assigned to another tenant.");
     return;
   }
   const conflictingTenant = findConflictingTenantForUnit(linkedUnitId, leaseStart, leaseEnd, tenant.id);
@@ -3196,6 +3822,7 @@ async function onEditTenant(event) {
   tenant.tenantName = document.getElementById("editTenantName").value.trim();
   tenant.email = document.getElementById("editTenantEmail").value.trim();
   tenant.mobile = parsedMobile || "";
+  tenant.tenantPin = tenantPin;
   tenant.monthlyRent = Number(document.getElementById("editMonthlyRent").value);
   tenant.deposit = Number(document.getElementById("editDeposit").value || 0);
   tenant.notes = document.getElementById("editTenantNotes").value.trim();
@@ -3213,6 +3840,7 @@ function cancelEditTenant() {
   editingTenantId = "";
   editDocKeysToDelete = new Set();
   activeTenantEditFormEl.reset();
+  setPinMasked(showEditTenantPinEl, editTenantPinEl);
   if (editExistingDocsEl) editExistingDocsEl.innerHTML = "";
   activeTenantEditCardEl.classList.add("hidden");
 }
@@ -3279,6 +3907,7 @@ function initEditorAccess() {
   if (!editorUser || !EDIT_USERS.some((user) => user.username === editorUser)) {
     editorUser = "";
   }
+  tenantSessionTenantId = localStorage.getItem(TENANT_ACCESS_KEY) || "";
 
   if (editorAccessFormEl) {
     editorAccessFormEl.noValidate = true;
@@ -3287,6 +3916,12 @@ function initEditorAccess() {
     editorLoginBtnEl.addEventListener("click", (event) => {
       event.preventDefault();
       onEditorLogin(event);
+    });
+  }
+  if (tenantLoginBtnEl) {
+    tenantLoginBtnEl.addEventListener("click", (event) => {
+      event.preventDefault();
+      onTenantLogin(event);
     });
   }
   if (editorPinEl) {
@@ -3317,6 +3952,7 @@ async function onManualRefresh() {
     }
     activeMonthInput.value = state.activeMonth;
     renderAll();
+    window.location.reload();
   } catch {
     alert("Refresh failed. Please try again.");
   } finally {
@@ -3340,8 +3976,11 @@ function onEditorLogin(event) {
   }
   editorUser = matched.username;
   localStorage.setItem(EDIT_ACCESS_KEY, editorUser);
+  tenantSessionTenantId = "";
+  localStorage.removeItem(TENANT_ACCESS_KEY);
   editorPinEl.value = "";
   settingsEditMode.propertyAddress = false;
+  settingsEditMode.paymentOptions = false;
   settingsEditMode.mailConfig = false;
   settingsEditMode.accessControl = false;
   settingsEditMode.accessPins = false;
@@ -3354,6 +3993,28 @@ function onEditorLogin(event) {
   }
 }
 
+function onTenantLogin(event) {
+  event.preventDefault();
+  const pinRaw = String(editorPinEl.value || "").trim();
+  const pin = pinRaw.replace(/\D/g, "");
+  if (!pin) {
+    alert("Enter PIN.");
+    return;
+  }
+  const tenant = getTenantByPin(pin);
+  if (!tenant) {
+    alert("Invalid tenant PIN.");
+    return;
+  }
+  tenantSessionTenantId = tenant.id;
+  localStorage.setItem(TENANT_ACCESS_KEY, tenantSessionTenantId);
+  editorUser = "";
+  localStorage.removeItem(EDIT_ACCESS_KEY);
+  editorPinEl.value = "";
+  updateEditorStatusUi();
+  renderAll();
+}
+
 function getUserByPin(pin) {
   if (pin && pin === getPinByUser("admin")) return "admin";
   if (pin && pin === getPinByUser("manager")) return "manager";
@@ -3361,9 +4022,25 @@ function getUserByPin(pin) {
   return "";
 }
 
+function getTenantByPin(pin, excludeTenantId = "") {
+  const safePin = String(pin || "").trim().replace(/\D/g, "");
+  if (!safePin) return null;
+  return (
+    state.tenants.find(
+      (tenant) =>
+        tenant.id !== excludeTenantId &&
+        String(tenant.tenantPin || "")
+          .trim()
+          .replace(/\D/g, "") === safePin
+    ) || null
+  );
+}
+
 function onEditorLogout() {
   editorUser = "";
+  tenantSessionTenantId = "";
   localStorage.removeItem(EDIT_ACCESS_KEY);
+  localStorage.removeItem(TENANT_ACCESS_KEY);
   editorPinEl.value = "";
   cancelEditTenant();
   cancelUnitEdit();
@@ -3372,6 +4049,7 @@ function onEditorLogout() {
   activeTenantAddCardEl.classList.add("hidden");
   unitAddCardEl.classList.add("hidden");
   settingsEditMode.propertyAddress = false;
+  settingsEditMode.paymentOptions = false;
   settingsEditMode.mailConfig = false;
   settingsEditMode.accessControl = false;
   settingsEditMode.accessPins = false;
@@ -3384,6 +4062,17 @@ function getCurrentUserRecord() {
   return EDIT_USERS.find((user) => user.username === editorUser) || null;
 }
 
+function getCurrentTenantSessionRecord() {
+  if (!tenantSessionTenantId) return null;
+  const tenant = state.tenants.find((entry) => entry.id === tenantSessionTenantId) || null;
+  if (!tenant) {
+    tenantSessionTenantId = "";
+    localStorage.removeItem(TENANT_ACCESS_KEY);
+    return null;
+  }
+  return tenant;
+}
+
 function getPinByUser(username) {
   const key = String(username || "").trim().toLowerCase();
   if (!key) return "";
@@ -3392,6 +4081,10 @@ function getPinByUser(username) {
 
 function isAuthenticated() {
   return Boolean(getCurrentUserRecord());
+}
+
+function isTenantAuthenticated() {
+  return Boolean(getCurrentTenantSessionRecord());
 }
 
 function getCurrentRole() {
@@ -3404,6 +4097,7 @@ function hasPermission(permission) {
 
   if (role === "admin") return true;
   if (role === "manager") {
+    if (permission === "message_post") return true;
     if (permission === "mark_paid" || permission === "notify_tenant") return true;
     if (permission === "maintenance_add") {
       return (
@@ -3454,6 +4148,11 @@ function updateEditorStatusUi() {
     editorStatusEl.textContent = role === "admin" ? "Admin" : role === "manager" ? "Manager" : "Viewer";
     editorStatusEl.classList.add("ok");
     editorAccessFormEl.classList.add("authenticated");
+  } else if (isTenantAuthenticated()) {
+    const tenant = getCurrentTenantSessionRecord();
+    editorStatusEl.textContent = tenant ? `Tenant: ${tenant.tenantName}` : "Tenant";
+    editorStatusEl.classList.add("ok");
+    editorAccessFormEl.classList.add("authenticated");
   } else {
     editorStatusEl.textContent = "Not signed in";
     editorStatusEl.classList.remove("ok");
@@ -3474,6 +4173,27 @@ function updateEditorStatusUi() {
 }
 
 function applyAnonymousVisibility() {
+  if (isTenantAuthenticated()) {
+    setActiveTab("tenant-view");
+    tabsContainerEl.classList.add("hidden");
+    dashboardNonMetricSections.forEach((section) => section.classList.add("hidden"));
+    tabPanels.forEach((panel) => {
+      if (panel.dataset.tabPanel !== "tenant-view") {
+        panel.classList.add("hidden");
+      } else {
+        panel.classList.remove("hidden");
+      }
+    });
+    settingsTabBtnEl.classList.add("hidden");
+    settingsPanelEl.classList.add("hidden");
+    activeTenantAddCardEl.classList.add("hidden");
+    activeTenantEditCardEl.classList.add("hidden");
+    unitAddCardEl.classList.add("hidden");
+    if (maintenanceAddCardEl) maintenanceAddCardEl.classList.add("hidden");
+    if (serviceProviderAddCardEl) serviceProviderAddCardEl.classList.add("hidden");
+    return;
+  }
+
   if (isAuthenticated()) {
     tabsContainerEl.classList.remove("hidden");
     dashboardNonMetricSections.forEach((section) => section.classList.remove("hidden"));
@@ -3496,7 +4216,7 @@ function applyAnonymousVisibility() {
     settingsTabBtnEl.classList.toggle("hidden", !canManageSettings);
     settingsPanelEl.classList.toggle("hidden", !canManageSettings);
     const currentActive = document.querySelector(".tab-btn.active");
-    if (currentActive && currentActive.classList.contains("hidden")) {
+    if (!currentActive || currentActive.classList.contains("hidden")) {
       setActiveTab("dashboard");
     }
     return;
@@ -3620,6 +4340,13 @@ function getBuildingLandlord(buildingName) {
   return String(landlords[key] || "").trim();
 }
 
+function getBuildingPaymentDetails(buildingName) {
+  const key = normalizeUnitText(buildingName);
+  if (!key) return null;
+  const paymentMap = state.notifyConfig.buildingPaymentOptions || {};
+  return paymentMap[key] || null;
+}
+
 function getUnitOptionsHtml() {
   return state.units
     .slice()
@@ -3696,6 +4423,11 @@ function normalizeAccessPins(pins) {
   const unique = new Set([normalized.viewer, normalized.manager, normalized.admin]);
   if (unique.size !== 3) return defaults;
   return normalized;
+}
+
+function normalizeTenantPin(value) {
+  const raw = String(value || "").trim().replace(/\D/g, "");
+  return /^\d{4,8}$/.test(raw) ? raw : "";
 }
 
 function normalizeAccessControl(config) {
@@ -3801,7 +4533,8 @@ function normalizeNotifyConfig(config) {
       senderName: "Rental Management",
       reviewSubjectTemplate: "Payment Review Required: {unit} {tenant name}",
       buildingAddresses: {},
-      buildingLandlords: {}
+      buildingLandlords: {},
+      buildingPaymentOptions: {}
     };
   }
   return {
@@ -3813,7 +4546,8 @@ function normalizeNotifyConfig(config) {
     senderName: config.senderName || "Rental Management",
     reviewSubjectTemplate: config.reviewSubjectTemplate || "Payment Review Required: {unit} {tenant name}",
     buildingAddresses: normalizeBuildingAddresses(config.buildingAddresses),
-    buildingLandlords: normalizeBuildingLandlords(config.buildingLandlords)
+    buildingLandlords: normalizeBuildingLandlords(config.buildingLandlords),
+    buildingPaymentOptions: normalizeBuildingPaymentOptions(config.buildingPaymentOptions)
   };
 }
 
@@ -3837,6 +4571,27 @@ function normalizeBuildingLandlords(landlords) {
     const value = String(landlord || "").trim();
     if (!name || !value) return;
     normalized[name] = value;
+  });
+  return normalized;
+}
+
+function normalizeBuildingPaymentOptions(options) {
+  if (!options || typeof options !== "object") return {};
+  const normalized = {};
+  Object.entries(options).forEach(([building, details]) => {
+    const name = normalizeUnitText(building);
+    if (!name) return;
+    const detailObj = details && typeof details === "object" ? details : {};
+    normalized[name] = {
+      paymentLink: String(detailObj.paymentLink || "").trim(),
+      upiId: String(detailObj.upiId || "").trim(),
+      phonePeNumber: String(detailObj.phonePeNumber || "").trim(),
+      bankAccountHolder: String(detailObj.bankAccountHolder || "").trim(),
+      bankAccountNumber: String(detailObj.bankAccountNumber || "").trim(),
+      bankIfsc: String(detailObj.bankIfsc || "").trim(),
+      bankName: String(detailObj.bankName || "").trim(),
+      notes: String(detailObj.notes || "").trim()
+    };
   });
   return normalized;
 }
@@ -3891,6 +4646,76 @@ function renderBuildingAddressFields() {
   });
 }
 
+function renderBuildingPaymentFields() {
+  if (!buildingPaymentFieldsEl) return;
+  const buildings = getKnownBuildingNames();
+  const paymentMap = state.notifyConfig.buildingPaymentOptions || {};
+  if (!buildings.length) {
+    buildingPaymentFieldsEl.innerHTML =
+      '<div class="empty-note">No buildings found yet. Add units to configure payment options.</div>';
+    return;
+  }
+
+  buildingPaymentFieldsEl.innerHTML = "";
+  buildings.forEach((building) => {
+    const details = paymentMap[building] || {};
+    const wrapper = document.createElement("div");
+    wrapper.className = "building-setting-group";
+    wrapper.innerHTML = `
+      <h3 class="subhead">${escapeHtml(building)} Payment Details</h3>
+      <label>
+        Payment Link
+        <input type="url" placeholder="https://payment-link" data-payment-link="${escapeHtml(building)}" value="${escapeHtml(
+          details.paymentLink || ""
+        )}" />
+      </label>
+      <label>
+        UPI ID
+        <input type="text" placeholder="name@upi" data-upi-id="${escapeHtml(building)}" value="${escapeHtml(
+          details.upiId || ""
+        )}" />
+      </label>
+      <label>
+        PhonePe Number
+        <input type="tel" placeholder="+91 9876543210" data-phone-pe-number="${escapeHtml(building)}" value="${escapeHtml(
+          details.phonePeNumber || ""
+        )}" />
+      </label>
+      <label>
+        Bank Account Holder
+        <input type="text" placeholder="Account holder name" data-bank-holder="${escapeHtml(building)}" value="${escapeHtml(
+          details.bankAccountHolder || ""
+        )}" />
+      </label>
+      <label>
+        Bank Account Number
+        <input type="text" placeholder="Account number" data-bank-account-number="${escapeHtml(building)}" value="${escapeHtml(
+          details.bankAccountNumber || ""
+        )}" />
+      </label>
+      <label>
+        IFSC Code
+        <input type="text" placeholder="IFSC code" data-bank-ifsc="${escapeHtml(building)}" value="${escapeHtml(
+          details.bankIfsc || ""
+        )}" />
+      </label>
+      <label>
+        Bank Name
+        <input type="text" placeholder="Bank name" data-bank-name="${escapeHtml(building)}" value="${escapeHtml(
+          details.bankName || ""
+        )}" />
+      </label>
+      <label>
+        Additional Payment Notes
+        <textarea rows="2" placeholder="Optional payment instructions" data-payment-notes="${escapeHtml(building)}">${escapeHtml(
+          details.notes || ""
+        )}</textarea>
+      </label>
+    `;
+    buildingPaymentFieldsEl.appendChild(wrapper);
+  });
+}
+
 function getBuildingAddressesFromSettings() {
   const existing = { ...(state.notifyConfig.buildingAddresses || {}) };
   if (!buildingAddressFieldsEl) return normalizeBuildingAddresses(existing);
@@ -3919,6 +4744,38 @@ function getBuildingLandlordsFromSettings() {
   });
 
   return normalizeBuildingLandlords(existing);
+}
+
+function getBuildingPaymentOptionsFromSettings() {
+  const existing = { ...(state.notifyConfig.buildingPaymentOptions || {}) };
+  if (!buildingPaymentFieldsEl) return normalizeBuildingPaymentOptions(existing);
+
+  const setField = (selector, key) => {
+    buildingPaymentFieldsEl.querySelectorAll(selector).forEach((field) => {
+      const building = normalizeUnitText(field.dataset[key] || "");
+      if (!building) return;
+      const value = String(field.value || "").trim();
+      if (!existing[building]) existing[building] = {};
+      existing[building][keyToPaymentFieldName(key)] = value;
+    });
+  };
+
+  setField("input[data-payment-link]", "paymentLink");
+  setField("input[data-upi-id]", "upiId");
+  setField("input[data-phone-pe-number]", "phonePeNumber");
+  setField("input[data-bank-holder]", "bankHolder");
+  setField("input[data-bank-account-number]", "bankAccountNumber");
+  setField("input[data-bank-ifsc]", "bankIfsc");
+  setField("input[data-bank-name]", "bankName");
+  setField("textarea[data-payment-notes]", "paymentNotes");
+
+  return normalizeBuildingPaymentOptions(existing);
+}
+
+function keyToPaymentFieldName(key) {
+  if (key === "bankHolder") return "bankAccountHolder";
+  if (key === "paymentNotes") return "notes";
+  return key;
 }
 
 function isEmailServiceConfigured() {
@@ -3987,7 +4844,7 @@ function notifyAdminsForReview(tenant, monthKey) {
           to_name: "Admin",
           cc_emails: "",
           subject: formatReviewSubject(tenant, monthKey),
-          message: `A manager marked rent as Review.\n\nTenant: ${tenant.tenantName}\nProperty: ${getTenantPropertyName(tenant)}\nMonth: ${formatMonth(monthKey)}\nAmount: ${money(tenant.monthlyRent)}\n\nPlease review and verify payment.`
+          message: `Manager completed review.\n\nTenant: ${tenant.tenantName}\nProperty: ${getTenantPropertyName(tenant)}\nMonth: ${formatMonth(monthKey)}\nAmount: ${money(tenant.monthlyRent)}\n\nPlease verify and mark as paid.`
         }
       })
     }).then((response) => {

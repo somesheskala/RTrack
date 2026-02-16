@@ -18,7 +18,7 @@
       rel="stylesheet"
     />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260214cl" />
+    <link rel="stylesheet" href="styles.css?v=20260214cp" />
   </head>
   <body>
     <header class="site-header">
@@ -28,6 +28,7 @@
         <label for="editorPin" class="editor-login-only pin-label">Access PIN</label>
         <input type="password" id="editorPin" class="editor-login-only pin-input" placeholder="••••" maxlength="8" inputmode="numeric" />
         <button type="button" class="btn btn-small editor-login-only" id="editorLoginBtn">Login</button>
+        <button type="button" class="btn btn-small btn-muted editor-login-only" id="tenantLoginBtn">Tenant Login</button>
         <button type="button" class="btn btn-small btn-muted editor-always" id="manualRefreshBtn">Refresh</button>
         <span id="editorStatus" class="editor-status editor-auth-only">View only mode</span>
         <button type="button" class="btn btn-small btn-muted editor-logout-only" id="editorLogout">Logout</button>
@@ -70,6 +71,25 @@
           <div id="dashboardTenantGroups"></div>
         </section>
 
+        <section class="card" id="messageBoardCard">
+          <div class="table-head">
+            <h2>Message Board</h2>
+          </div>
+          <form id="messageBoardForm" class="message-board-form">
+            <label id="messageBoardComposeField">
+              Message
+              <textarea id="messageBoardText" rows="3" placeholder="Type a message for all tenants..." maxlength="1000"></textarea>
+            </label>
+            <div class="message-board-footer">
+              <button type="button" class="btn btn-small btn-muted" id="announcementToggleBtn">Disable Announcements</button>
+              <div class="actions" id="messageBoardPostActions">
+                <button type="submit" class="btn btn-small" id="messageBoardPostBtn">Post Message</button>
+              </div>
+            </div>
+          </form>
+          <div id="messageBoardList"></div>
+        </section>
+
       </section>
 
       <section class="tab-panel" data-tab-panel="active-tenants">
@@ -86,6 +106,14 @@
               <label>
                 Tenant Name
                 <input type="text" id="tenantName" required placeholder="John Smith" />
+              </label>
+              <label>
+                Tenant PIN
+                <input type="password" id="tenantPin" inputmode="numeric" maxlength="8" placeholder="4-8 digits" required />
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="showTenantPin" />
+                Show PIN
               </label>
               <label>
                 Email
@@ -145,6 +173,14 @@
               <label>
                 Tenant Name
                 <input type="text" id="editTenantName" required />
+              </label>
+              <label>
+                Tenant PIN
+                <input type="password" id="editTenantPin" inputmode="numeric" maxlength="8" placeholder="4-8 digits" required />
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="showEditTenantPin" />
+                Show PIN
               </label>
               <label>
                 Email
@@ -221,6 +257,19 @@
           </div>
           <p>Configure building-wise landlord name and address used in rental receipts.</p>
           <div id="buildingAddressFields" class="form-grid"></div>
+        </section>
+
+        <section class="card settings-section" id="paymentOptionsSection">
+          <div class="table-head">
+            <h2>Payment Options</h2>
+            <div class="table-actions">
+              <button type="button" class="btn btn-small" id="editPaymentOptionsBtn">Edit</button>
+              <button type="button" class="btn btn-small hidden" id="savePaymentOptionsBtn">Save</button>
+              <button type="button" class="btn btn-small btn-muted hidden" id="cancelPaymentOptionsBtn">Cancel</button>
+            </div>
+          </div>
+          <p>Configure building-wise payment details for tenant portal payment options.</p>
+          <div id="buildingPaymentFields" class="form-grid"></div>
         </section>
 
         <section class="card settings-section" id="mailConfigSection">
@@ -520,6 +569,13 @@
         </section>
       </section>
 
+      <section class="tab-panel" data-tab-panel="tenant-view" id="tenantPortalPanel">
+        <section class="card tenant-portal-card" id="tenantPortalCard">
+          <h2>Tenant Portal</h2>
+          <p>Please login with your tenant PIN to view your lease and payment details.</p>
+        </section>
+      </section>
+
       <section class="tab-panel" data-tab-panel="available-units">
         <section class="card hidden" id="unitAddCard">
           <h2 id="unitFormTitle">Unit Occupancy - Add Unit</h2>
@@ -617,8 +673,8 @@
         });
       })();
     </script>
-    <script src="config.js?v=20260214cl"></script>
-    <script src="utils.js?v=20260214cl"></script>
-    <script src="app.js?v=20260214cl"></script>
+    <script src="config.js?v=20260214cp"></script>
+    <script src="utils.js?v=20260214cp"></script>
+    <script src="app.js?v=20260214cp"></script>
   </body>
 </html>
