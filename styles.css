@@ -417,6 +417,26 @@ textarea:focus {
   gap: 0.5rem;
 }
 
+.month-picker-modern {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.3rem;
+  border: 1px solid rgba(84, 65, 48, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.month-picker-modern select {
+  min-width: 95px;
+  padding: 0.45rem 0.55rem;
+}
+
+.month-nav-btn {
+  min-width: 34px;
+  line-height: 1;
+}
+
 .table-actions {
   display: flex;
   align-items: center;

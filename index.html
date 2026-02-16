@@ -18,7 +18,7 @@
       rel="stylesheet"
     />
     <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260214cp" />
+    <link rel="stylesheet" href="styles.css?v=20260214cs" />
   </head>
   <body>
     <header class="site-header">
@@ -63,7 +63,13 @@
               <button type="button" class="btn btn-small btn-muted" id="collapseDashboardTenants" title="Collapse All" aria-label="Collapse All">▲</button>
               <div class="month-control">
                 <label for="activeMonth">Payment Month</label>
-                <input type="month" id="activeMonth" />
+                <div class="month-picker-modern" id="activeMonthPicker">
+                  <button type="button" class="btn btn-small btn-muted month-nav-btn" id="activeMonthPrev" aria-label="Previous month">◀</button>
+                  <select id="activeMonthSelect" aria-label="Select month"></select>
+                  <select id="activeYearSelect" aria-label="Select year"></select>
+                  <button type="button" class="btn btn-small btn-muted month-nav-btn" id="activeMonthNext" aria-label="Next month">▶</button>
+                </div>
+                <input type="month" id="activeMonth" class="hidden" aria-hidden="true" tabindex="-1" />
               </div>
               <button type="button" class="btn btn-small" id="exportMonthlyReport">Print</button>
             </div>
@@ -673,8 +679,8 @@
         });
       })();
     </script>
-    <script src="config.js?v=20260214cp"></script>
-    <script src="utils.js?v=20260214cp"></script>
-    <script src="app.js?v=20260214cp"></script>
+    <script src="config.js?v=20260214cs"></script>
+    <script src="utils.js?v=20260214cs"></script>
+    <script src="app.js?v=20260214cs"></script>
   </body>
 </html>

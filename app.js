@@ -271,6 +271,10 @@ const editTenantPinEl = document.getElementById("editTenantPin");
 const showTenantPinEl = document.getElementById("showTenantPin");
 const showEditTenantPinEl = document.getElementById("showEditTenantPin");
 const activeMonthInput = document.getElementById("activeMonth");
+const activeMonthSelectEl = document.getElementById("activeMonthSelect");
+const activeYearSelectEl = document.getElementById("activeYearSelect");
+const activeMonthPrevEl = document.getElementById("activeMonthPrev");
+const activeMonthNextEl = document.getElementById("activeMonthNext");
 const tabsContainerEl = document.querySelector(".tabs");
 const dashboardPanelEl = document.querySelector('[data-tab-panel="dashboard"]');
 const settingsTabBtnEl = document.getElementById("settingsTabBtn");
@@ -317,6 +321,8 @@ async function init() {
   initEditorAccess();
   await initializeDataLayer();
   activeMonthInput.value = state.activeMonth;
+  setupActiveMonthPicker();
+  syncActiveMonthPicker(state.activeMonth);
   todayDateEl.textContent = new Date().toLocaleDateString();
   renderAll();
 
@@ -324,6 +330,7 @@ async function init() {
   activeMonthInput.addEventListener("change", () => {
     state.activeMonth = sanitizeMonthKey(activeMonthInput.value);
     activeMonthInput.value = state.activeMonth;
+    syncActiveMonthPicker(state.activeMonth);
     saveState();
     renderAll();
   });
@@ -630,6 +637,7 @@ async function onAddTenant(event) {
 
 function renderAll() {
   applyAppTheme();
+  syncActiveMonthPicker(state.activeMonth);
   syncDashboardPaymentsVisibility();
   renderMetrics();
   try {
@@ -659,6 +667,56 @@ function renderAll() {
       `;
     }
   }
+}
+
+function setupActiveMonthPicker() {
+  if (!activeMonthInput || !activeMonthSelectEl || !activeYearSelectEl) return;
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  activeMonthSelectEl.innerHTML = monthNames
+    .map((label, idx) => `<option value="${String(idx + 1).padStart(2, "0")}">${label}</option>`)
+    .join("");
+
+  const currentYear = new Date().getFullYear();
+  const years = [];
+  for (let year = currentYear - 5; year <= currentYear + 5; year += 1) years.push(year);
+  activeYearSelectEl.innerHTML = years.map((year) => `<option value="${year}">${year}</option>`).join("");
+
+  const onPickerChange = () => {
+    const month = String(activeMonthSelectEl.value || "");
+    const year = String(activeYearSelectEl.value || "");
+    if (!month || !year) return;
+    const monthKey = sanitizeMonthKey(`${year}-${month}`);
+    state.activeMonth = monthKey;
+    activeMonthInput.value = monthKey;
+    saveState();
+    renderAll();
+  };
+  activeMonthSelectEl.addEventListener("change", onPickerChange);
+  activeYearSelectEl.addEventListener("change", onPickerChange);
+  if (activeMonthPrevEl) {
+    activeMonthPrevEl.addEventListener("click", () => shiftActiveMonth(-1));
+  }
+  if (activeMonthNextEl) {
+    activeMonthNextEl.addEventListener("click", () => shiftActiveMonth(1));
+  }
+}
+
+function syncActiveMonthPicker(monthKey) {
+  const safeMonth = sanitizeMonthKey(monthKey || state.activeMonth);
+  const [year, month] = safeMonth.split("-");
+  if (activeMonthSelectEl && month) activeMonthSelectEl.value = month;
+  if (activeYearSelectEl && year) activeYearSelectEl.value = year;
+  if (activeMonthInput) activeMonthInput.value = safeMonth;
+}
+
+function shiftActiveMonth(delta) {
+  const safeMonth = sanitizeMonthKey(state.activeMonth);
+  const [yearRaw, monthRaw] = safeMonth.split("-").map(Number);
+  const nextDate = new Date(yearRaw, monthRaw - 1 + Number(delta || 0), 1);
+  const nextMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`;
+  state.activeMonth = sanitizeMonthKey(nextMonth);
+  saveState();
+  renderAll();
 }
 
 function syncDashboardPaymentsVisibility() {
