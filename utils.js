@@ -1,9 +1,47 @@
 (function () {
-  const getCurrentMonth = () => new Date().toISOString().slice(0, 7);
+  const INDIA_TZ = "Asia/Kolkata";
+
+  const getIndiaDateParts = (date = new Date()) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: INDIA_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+    const get = (type) => parts.find((part) => part.type === type)?.value || "";
+    return {
+      year: get("year"),
+      month: get("month"),
+      day: get("day")
+    };
+  };
+
+  const getCurrentMonth = () => {
+    const { year, month } = getIndiaDateParts();
+    return `${year}-${month}`;
+  };
+
+  const getTodayIsoIndia = () => {
+    const { year, month, day } = getIndiaDateParts();
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseIsoDateLocal = (value) => {
+    const raw = String(value || "").trim();
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      return new Date(year, month - 1, day);
+    }
+    const fallback = new Date(raw);
+    return Number.isNaN(fallback.getTime()) ? new Date(0) : fallback;
+  };
 
   const formatMonth = (yyyyMm) => {
     const [year, month] = yyyyMm.split("-").map(Number);
-    return new Date(year, month - 1, 1).toLocaleDateString(undefined, {
+    return new Date(year, month - 1, 1).toLocaleDateString("en-IN", {
       month: "long",
       year: "numeric"
     });
@@ -11,7 +49,7 @@
 
   const formatMonthShort = (yyyyMm) => {
     const [year, month] = yyyyMm.split("-").map(Number);
-    return new Date(year, month - 1, 1).toLocaleDateString(undefined, {
+    return new Date(year, month - 1, 1).toLocaleDateString("en-IN", {
       month: "short",
       year: "numeric"
     });
@@ -20,7 +58,7 @@
   const formatDate = (yyyyMmDd) => {
     if (!yyyyMmDd) return "-";
     const [year, month, day] = yyyyMmDd.split("-").map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString();
+    return new Date(year, month - 1, day).toLocaleDateString("en-IN");
   };
 
   const money = (amount) =>
@@ -71,10 +109,10 @@
       .filter((email, index, arr) => arr.indexOf(email) === index);
 
   const leasesOverlap = (startA, endA, startB, endB) => {
-    const aStart = new Date(startA);
-    const aEnd = new Date(endA);
-    const bStart = new Date(startB);
-    const bEnd = new Date(endB);
+    const aStart = parseIsoDateLocal(startA);
+    const aEnd = parseIsoDateLocal(endA);
+    const bStart = parseIsoDateLocal(startB);
+    const bEnd = parseIsoDateLocal(endB);
     return aStart <= bEnd && aEnd >= bStart;
   };
 
@@ -84,6 +122,7 @@
     formatMonth,
     formatMonthShort,
     getCurrentMonth,
+    getTodayIsoIndia,
     getUnitKey,
     leasesOverlap,
     money,

@@ -1326,6 +1326,27 @@ textarea:focus {
   gap: 0.4rem;
 }
 
+.tenant-phonepe-qr-wrap {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.tenant-pay-link-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.tenant-phonepe-qr {
+  width: 180px;
+  max-width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(89, 69, 51, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.2rem;
+}
+
 .tenant-portal-timeline > summary {
   cursor: pointer;
   list-style: none;
@@ -1518,6 +1539,29 @@ textarea:focus {
   margin-top: 0.3rem;
   color: #6b5d4d;
   font-size: 0.72rem;
+}
+
+.settings-qr-preview-wrap {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.45rem;
+  border: 1px solid rgba(83, 64, 46, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.settings-qr-preview-wrap span {
+  font-size: 0.74rem;
+  color: #5e4f41;
+  font-weight: 700;
+}
+
+.settings-qr-preview {
+  width: 140px;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(83, 64, 46, 0.16);
+  background: #fff;
 }
 
 .metrics {

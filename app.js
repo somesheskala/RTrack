@@ -1,17 +1,36 @@
 const utils = window.AppUtils || {
-  getCurrentMonth: () => new Date().toISOString().slice(0, 7),
+  getCurrentMonth: () => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+    const get = (type) => parts.find((part) => part.type === type)?.value || "";
+    return `${get("year")}-${get("month")}`;
+  },
+  getTodayIsoIndia: () => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+    const get = (type) => parts.find((part) => part.type === type)?.value || "";
+    return `${get("year")}-${get("month")}-${get("day")}`;
+  },
   formatMonth: (yyyyMm) => {
     const [year, month] = yyyyMm.split("-").map(Number);
-    return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    return new Date(year, month - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
   },
   formatMonthShort: (yyyyMm) => {
     const [year, month] = yyyyMm.split("-").map(Number);
-    return new Date(year, month - 1, 1).toLocaleDateString(undefined, { month: "short", year: "numeric" });
+    return new Date(year, month - 1, 1).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
   },
   formatDate: (yyyyMmDd) => {
     if (!yyyyMmDd) return "-";
     const [year, month, day] = yyyyMmDd.split("-").map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString();
+    return new Date(year, month - 1, day).toLocaleDateString("en-IN");
   },
   money: (amount) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(
@@ -53,10 +72,22 @@ const utils = window.AppUtils || {
       .filter(Boolean)
       .filter((email, index, arr) => arr.indexOf(email) === index),
   leasesOverlap: (startA, endA, startB, endB) => {
-    const aStart = new Date(startA);
-    const aEnd = new Date(endA);
-    const bStart = new Date(startB);
-    const bEnd = new Date(endB);
+    const parseIsoDateLocal = (value) => {
+      const raw = String(value || "").trim();
+      const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (match) {
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        return new Date(year, month - 1, day);
+      }
+      const fallback = new Date(raw);
+      return Number.isNaN(fallback.getTime()) ? new Date(0) : fallback;
+    };
+    const aStart = parseIsoDateLocal(startA);
+    const aEnd = parseIsoDateLocal(endA);
+    const bStart = parseIsoDateLocal(startB);
+    const bEnd = parseIsoDateLocal(endB);
     return aStart <= bEnd && aEnd >= bStart;
   }
 };
@@ -66,6 +97,7 @@ const {
   formatMonth,
   formatMonthShort,
   getCurrentMonth,
+  getTodayIsoIndia,
   getUnitKey,
   leasesOverlap,
   money,
@@ -323,7 +355,7 @@ async function init() {
   activeMonthInput.value = state.activeMonth;
   setupActiveMonthPicker();
   syncActiveMonthPicker(state.activeMonth);
-  todayDateEl.textContent = new Date().toLocaleDateString();
+  todayDateEl.textContent = formatDate(getTodayIsoIndia());
   renderAll();
 
   tenantForm.addEventListener("submit", onAddTenant);
@@ -565,7 +597,7 @@ async function onAddTenant(event) {
   const parsedMobile = parseIndianMobile(document.getElementById("tenantMobile").value);
   const tenantPin = normalizeTenantPin(tenantPinEl?.value || "");
 
-  if (new Date(leaseStart) > new Date(leaseEnd)) {
+  if (parseIsoDateLocal(leaseStart) > parseIsoDateLocal(leaseEnd)) {
     alert("Lease start date cannot be after lease end date.");
     return;
   }
@@ -860,8 +892,8 @@ function onActiveTenantGroupAction(event) {
   }
 }
 
-function isTenantLeaseEnded(tenant, today = new Date()) {
-  const end = normalizeDate(new Date(tenant.leaseEnd));
+function isTenantLeaseEnded(tenant, today = parseIsoDateLocal(getTodayIsoIndia())) {
+  const end = normalizeDate(parseIsoDateLocal(tenant.leaseEnd));
   const target = normalizeDate(today);
   return end < target;
 }
@@ -1056,12 +1088,72 @@ function getTenantBannerAnnouncement() {
   return getSortedMessageBoardEntries()[0] || null;
 }
 
+function formatUpiAmount(amount) {
+  const value = Number(amount || 0);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  return value % 1 === 0 ? String(Math.trunc(value)) : value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function buildTenantUpiPaymentUrl(baseUrl, upiId, amount, tenant, monthKey) {
+  const rawBase = String(baseUrl || "").trim();
+  const rawUpi = String(upiId || "").trim();
+  const note = `Rent ${monthKey ? formatMonth(monthKey) : ""} ${getTenantPropertyName(tenant)}`.trim();
+  const amountValue = formatUpiAmount(amount);
+
+  const applyUpiParams = (params) => {
+    if (!params.get("pa") && rawUpi) params.set("pa", rawUpi);
+    if (amountValue) params.set("am", amountValue);
+    params.set("cu", "INR");
+    if (!params.get("tn") && note) params.set("tn", note);
+  };
+
+  if (rawBase.startsWith("upi://pay")) {
+    const query = rawBase.includes("?") ? rawBase.slice(rawBase.indexOf("?") + 1) : "";
+    const params = new URLSearchParams(query);
+    applyUpiParams(params);
+    return `upi://pay?${params.toString()}`;
+  }
+
+  if (!rawBase && rawUpi) {
+    const params = new URLSearchParams();
+    applyUpiParams(params);
+    return `upi://pay?${params.toString()}`;
+  }
+
+  return rawBase;
+}
+
+async function copyTextToClipboard(text) {
+  const value = String(text || "").trim();
+  if (!value) return false;
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+  } catch {}
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {}
+  document.body.removeChild(textarea);
+  return ok;
+}
+
 function formatMessageDate(isoDate) {
   const value = String(isoDate || "").trim();
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return date.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -1149,13 +1241,13 @@ function renderRows() {
 
           const role = getCurrentRole();
           if (hasPermission("mark_paid") && paymentStatus !== "paid") {
-            if (role === "manager" && paymentStatus === "tenant_submitted") {
-              const managerReviewBtn = document.createElement("button");
-              managerReviewBtn.type = "button";
-              managerReviewBtn.className = "btn btn-small mark-paid";
-              managerReviewBtn.textContent = "Manager Review";
-              managerReviewBtn.addEventListener("click", () => markPaid(tenant.id));
-              actionsCell.appendChild(managerReviewBtn);
+            if (role === "manager" && (paymentStatus === "due" || paymentStatus === "tenant_submitted")) {
+              const managerMarkPaidBtn = document.createElement("button");
+              managerMarkPaidBtn.type = "button";
+              managerMarkPaidBtn.className = "btn btn-small mark-paid";
+              managerMarkPaidBtn.textContent = "Mark Paid";
+              managerMarkPaidBtn.addEventListener("click", () => markPaid(tenant.id));
+              actionsCell.appendChild(managerMarkPaidBtn);
             } else if (role === "admin") {
               const adminMarkPaidBtn = document.createElement("button");
               adminMarkPaidBtn.type = "button";
@@ -1166,7 +1258,7 @@ function renderRows() {
             }
           }
 
-          if (role === "admin" && hasPermission("mark_unpaid") && paymentStatus !== "due") {
+          if (hasPermission("mark_unpaid") && paymentStatus !== "due") {
             const markUnpaidBtn = document.createElement("button");
             markUnpaidBtn.type = "button";
             markUnpaidBtn.className = "btn btn-small btn-muted mark-unpaid";
@@ -1226,7 +1318,7 @@ function printRentalReceipt(tenant, monthKey) {
   const buildingUnitLabel = `#${buildingName}, ${unitNumber}`;
   const buildingAddress = getBuildingAddress(buildingName);
   const printableAddress = buildingAddress ? `${buildingUnitLabel} ${buildingAddress}` : buildingUnitLabel;
-  const paidDateRaw = payment.paidDate || new Date().toISOString().slice(0, 10);
+  const paidDateRaw = payment.paidDate || getTodayIsoIndia();
   const paidDate = formatDateDdMmYyyy(paidDateRaw);
   const paidPeriod = formatMonth(monthKey);
   const amountValue = Number(tenant.monthlyRent || 0);
@@ -1234,6 +1326,7 @@ function printRentalReceipt(tenant, monthKey) {
   const paymentMode = "Bank Transfer";
   const paymentRef = payment.refNo || payment.referenceNo || payment.utr || "-";
   const landlordName = getBuildingLandlord(buildingName) || state.notifyConfig.senderName || "Rental Management";
+  const isMobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent || "");
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     alert("Popup blocked. Please allow popups and try again.");
@@ -1254,11 +1347,37 @@ function printRentalReceipt(tenant, monthKey) {
           .line-medium { min-width: 220px; }
           .line-small { min-width: 120px; }
           .sign-row { margin-top: 34px; }
+          .receipt-actions {
+            max-width: 820px;
+            margin: 0 auto 14px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+          }
+          .receipt-actions button {
+            border: 1px solid #333;
+            background: #fff;
+            padding: 8px 12px;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+          }
+          .mobile-note {
+            max-width: 820px;
+            margin: 0 auto 12px;
+            font-size: 13px;
+            color: #333;
+          }
+          @media print {
+            .receipt-actions, .mobile-note { display: none !important; }
+          }
           @media (max-width: 640px) {
             body { padding: 12px; }
             .receipt { max-width: 100%; padding: 14px; }
             h1 { font-size: 24px; letter-spacing: 0.04em; }
             p { font-size: 15px; line-height: 1.45; }
+            .receipt-actions { justify-content: stretch; }
+            .receipt-actions button { flex: 1; }
             .line { min-width: 40px; }
             .line-wide { min-width: 0; display: inline; }
             .line-medium { min-width: 0; display: inline; }
@@ -1267,6 +1386,15 @@ function printRentalReceipt(tenant, monthKey) {
         </style>
       </head>
       <body>
+        <div class="receipt-actions">
+          <button type="button" onclick="window.print()">Print</button>
+          <button type="button" onclick="window.close()">Close</button>
+        </div>
+        ${
+          isMobile
+            ? '<div class="mobile-note">If print preview hangs on mobile, tap Close and use screenshot/share as receipt.</div>'
+            : ""
+        }
         <div class="receipt">
           <h1>RENT RECEIPT</h1>
           <p>Date: <span class="line line-small">${escapeHtml(paidDate)}</span></p>
@@ -1294,7 +1422,13 @@ function printRentalReceipt(tenant, monthKey) {
   `);
   printWindow.document.close();
   printWindow.focus();
-  printWindow.print();
+  if (!isMobile) {
+    setTimeout(() => {
+      try {
+        printWindow.print();
+      } catch {}
+    }, 150);
+  }
 }
 
 function formatDateDdMmYyyy(yyyyMmDd) {
@@ -1494,26 +1628,16 @@ function markPaid(tenantId) {
   if (!isTenantActiveForMonth(tenant, state.activeMonth)) return;
   const role = getCurrentRole();
   const existing = tenant.payments[state.activeMonth] || { status: "due", paidDate: "" };
-  const today = new Date().toISOString().slice(0, 10);
-  const currentStatus = getPaymentStatus(tenant, state.activeMonth);
-
+  const today = getTodayIsoIndia();
   if (role === "manager") {
-    if (currentStatus === "paid") {
-      alert("This payment is already verified and marked as paid.");
-      return;
-    }
-    if (currentStatus !== "tenant_submitted") {
-      alert("Tenant must submit payment first before manager review.");
-      return;
-    }
     tenant.payments[state.activeMonth] = {
       ...existing,
-      status: "manager_review",
+      status: "admin_review",
       managerReviewDate: today,
       paid: false
     };
     notifyAdminsForReview(tenant, state.activeMonth).catch(() => {
-      alert("Payment moved to Manager Review, but failed to send admin notification email.");
+      alert("Moved to Admin Review, but failed to send admin notification email.");
     });
   } else {
     tenant.payments[state.activeMonth] = {
@@ -2373,10 +2497,40 @@ function renderTenantPortal() {
     });
   }
   if (paymentDetails?.phonePeNumber) {
+    const initialPhonePePayUrl = buildTenantUpiPaymentUrl(
+      paymentDetails.phonePeUrl,
+      paymentDetails.upiId,
+      Number(tenant.monthlyRent || 0),
+      tenant,
+      nextDueMonth
+    );
+    const phonePeCopyBtnHtml = initialPhonePePayUrl
+      ? `<button type="button" class="btn btn-small btn-muted" id="tenantCopyUpiLinkBtn" data-base-url="${escapeHtml(
+          paymentDetails.phonePeUrl || ""
+        )}" data-upi-id="${escapeHtml(paymentDetails.upiId || "")}">Copy UPI Link</button>`
+      : "";
+    const phonePeQrHtml = paymentDetails.phonePeQrUrl
+      ? `<div class="tenant-phonepe-qr-wrap"><span>Landlord QR</span><img class="tenant-phonepe-qr" src="${escapeHtml(
+          paymentDetails.phonePeQrUrl
+        )}" alt="Landlord PhonePe QR Code" loading="lazy" /></div>`
+      : "";
     paymentMethods.push({
       key: "phonepe",
       label: "PhonePe",
-      detailHtml: `<div><span>PhonePe Number</span><strong>${escapeHtml(paymentDetails.phonePeNumber)}</strong></div>`
+      detailHtml: `
+        <div><span>PhonePe Number</span><strong>${escapeHtml(paymentDetails.phonePeNumber)}</strong></div>
+        ${
+          initialPhonePePayUrl
+            ? `<div><span>PhonePe URL (mobile only)</span><strong id="tenantPhonePePayUrlText">${escapeHtml(initialPhonePePayUrl)}</strong></div>`
+            : ""
+        }
+        ${
+          phonePeCopyBtnHtml
+            ? `<div><span>Pay</span><strong class="tenant-pay-link-actions">${phonePeCopyBtnHtml}</strong></div>`
+            : ""
+        }
+        ${phonePeQrHtml}
+      `
     });
   }
   if (
@@ -2535,21 +2689,48 @@ function renderTenantPortal() {
 
   const paymentMethodSelectEl = document.getElementById("tenantPaymentMethodSelect");
   const paymentMethodDetailsEl = document.getElementById("tenantPaymentMethodDetails");
+  const monthEl = document.getElementById("tenantPaidMonth");
+  const amountEl = document.getElementById("tenantPaidAmount");
+  const bindTenantPhonePeCopyAction = () => {
+    const copyBtnEl = document.getElementById("tenantCopyUpiLinkBtn");
+    if (!copyBtnEl || copyBtnEl.dataset.boundClick === "1") return;
+    copyBtnEl.dataset.boundClick = "1";
+    copyBtnEl.addEventListener("click", async () => {
+      const copied = await copyTextToClipboard(copyBtnEl.dataset.dynamicUrl || "");
+      if (copied) alert("UPI payment link copied.");
+      else alert("Unable to copy link. Please copy it manually from the URL text.");
+    });
+  };
+  const refreshTenantPhonePeLink = () => {
+    const copyBtnEl = document.getElementById("tenantCopyUpiLinkBtn");
+    const payUrlTextEl = document.getElementById("tenantPhonePePayUrlText");
+    if (!copyBtnEl) return;
+    const baseUrl = String(copyBtnEl.dataset.baseUrl || "");
+    const upiId = String(copyBtnEl.dataset.upiId || "");
+    const selectedMonthKey = sanitizeMonthKey(monthEl?.value || nextDueMonth || "");
+    const selectedAmount = Number(amountEl?.value || tenant.monthlyRent || 0);
+    const dynamicUrl = buildTenantUpiPaymentUrl(baseUrl, upiId, selectedAmount, tenant, selectedMonthKey);
+    if (!dynamicUrl) return;
+    copyBtnEl.dataset.dynamicUrl = dynamicUrl;
+    if (payUrlTextEl) payUrlTextEl.textContent = dynamicUrl;
+  };
   const renderSelectedPaymentMethodDetails = () => {
     if (!paymentMethodSelectEl || !paymentMethodDetailsEl) return;
     const selectedKey = String(paymentMethodSelectEl.value || "");
     paymentMethodDetailsEl.innerHTML = paymentMethodDetailsByKey[selectedKey] || "";
+    refreshTenantPhonePeLink();
+    bindTenantPhonePeCopyAction();
   };
   if (paymentMethodSelectEl && paymentMethodDetailsEl) {
     renderSelectedPaymentMethodDetails();
     paymentMethodSelectEl.addEventListener("change", renderSelectedPaymentMethodDetails);
   }
+  if (monthEl) monthEl.addEventListener("change", refreshTenantPhonePeLink);
+  if (amountEl) amountEl.addEventListener("input", refreshTenantPhonePeLink);
 
   const tenantMarkPaidBtnEl = document.getElementById("tenantMarkPaidBtn");
   if (tenantMarkPaidBtnEl) {
     tenantMarkPaidBtnEl.addEventListener("click", () => {
-      const monthEl = document.getElementById("tenantPaidMonth");
-      const amountEl = document.getElementById("tenantPaidAmount");
       const monthKey = sanitizeMonthKey(monthEl?.value || "");
       const amount = Number(amountEl?.value || 0);
       if (!monthEl?.value) {
@@ -2570,7 +2751,7 @@ function renderTenantPortal() {
       }
       if (!tenant.payments || typeof tenant.payments !== "object") tenant.payments = {};
       const existingPayment = tenant.payments?.[monthKey] || { status: "due", paidDate: "" };
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getTodayIsoIndia();
       tenant.payments[monthKey] = {
         ...existingPayment,
         status: "tenant_submitted",
@@ -2788,12 +2969,17 @@ function savePropertyAddressConfig() {
   alert("Property address section saved.");
 }
 
-function savePaymentOptionsConfig() {
+async function savePaymentOptionsConfig() {
   if (!hasPermission("manage_notify_lists")) {
     alert("You do not have permission to manage payment options.");
     return;
   }
-  state.notifyConfig.buildingPaymentOptions = getBuildingPaymentOptionsFromSettings();
+  try {
+    state.notifyConfig.buildingPaymentOptions = await getBuildingPaymentOptionsFromSettings();
+  } catch (error) {
+    alert(String(error?.message || "Failed to process QR upload. Please try a smaller JPEG/PNG image."));
+    return;
+  }
   saveState();
   setSettingsSectionMode("paymentOptions", false);
   renderNotifyConfig();
@@ -3152,7 +3338,16 @@ function exportMonthlyReportPdf() {
         <h1>Monthly Rent Report</h1>
         <div class="meta">
           <p><strong>Month:</strong> ${escapeHtml(monthLabel)}</p>
-          <p><strong>Generated:</strong> ${escapeHtml(new Date().toLocaleString("en-IN"))}</p>
+          <p><strong>Generated:</strong> ${escapeHtml(
+            new Date().toLocaleString("en-IN", {
+              timeZone: "Asia/Kolkata",
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit"
+            })
+          )}</p>
           <p><strong>Tenant Count:</strong> Total ${totalTenants} | Active ${activeTenants.length} | Out of lease ${inactiveTenants.length}</p>
         </div>
 
@@ -3509,7 +3704,7 @@ function getPaymentStatus(tenant, monthKey) {
 
 function formatPaymentStatus(status) {
   if (status === "paid") return "Paid";
-  if (status === "tenant_submitted") return "Submitted";
+  if (status === "tenant_submitted") return "Tenant Paid";
   if (status === "manager_review") return "Manager Review";
   if (status === "admin_review" || status === "review") return "Admin Review";
   return "Due";
@@ -3523,7 +3718,7 @@ function getPaymentStatusClass(status) {
 function getLeaseChipMeta(monthKey, paymentStatus, currentMonthKey) {
   if (paymentStatus === "paid") return { className: "paid", label: "Paid" };
   if (monthKey > currentMonthKey) return { className: "future", label: "Future" };
-  if (paymentStatus === "tenant_submitted") return { className: "review", label: "Submitted" };
+  if (paymentStatus === "tenant_submitted") return { className: "review", label: "Tenant Paid" };
   if (paymentStatus === "manager_review") return { className: "review", label: "Manager Review" };
   if (paymentStatus === "admin_review" || paymentStatus === "review") return { className: "review", label: "Admin Review" };
   return { className: "due", label: "Due" };
@@ -3610,19 +3805,32 @@ function getActiveTenantsForMonth(yyyyMm) {
   return state.tenants.filter((tenant) => isTenantActiveForMonth(tenant, yyyyMm));
 }
 
+function parseIsoDateLocal(value) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    return new Date(year, month - 1, day);
+  }
+  const fallback = new Date(raw);
+  return Number.isNaN(fallback.getTime()) ? new Date(0) : fallback;
+}
+
 function isTenantActiveForMonth(tenant, yyyyMm) {
   const [year, month] = yyyyMm.split("-").map(Number);
   const monthStart = new Date(year, month - 1, 1);
   const monthEnd = new Date(year, month, 0);
-  const leaseStart = new Date(tenant.leaseStart);
-  const leaseEnd = new Date(tenant.leaseEnd);
+  const leaseStart = parseIsoDateLocal(tenant.leaseStart);
+  const leaseEnd = parseIsoDateLocal(tenant.leaseEnd);
   return leaseStart <= monthEnd && leaseEnd >= monthStart;
 }
 
 function getLeaseMonths(leaseStart, leaseEnd) {
   const months = [];
-  const start = new Date(leaseStart);
-  const end = new Date(leaseEnd);
+  const start = parseIsoDateLocal(leaseStart);
+  const end = parseIsoDateLocal(leaseEnd);
   const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
   const endMonth = new Date(end.getFullYear(), end.getMonth(), 1);
 
@@ -3817,7 +4025,7 @@ async function onEditTenant(event) {
   const linkedUnitId = editPropertyNameSelectEl.value;
   const parsedMobile = parseIndianMobile(document.getElementById("editTenantMobile").value);
   const tenantPin = normalizeTenantPin(editTenantPinEl?.value || "");
-  if (new Date(leaseStart) > new Date(leaseEnd)) {
+  if (parseIsoDateLocal(leaseStart) > parseIsoDateLocal(leaseEnd)) {
     alert("Lease start date cannot be after lease end date.");
     return;
   }
@@ -4644,6 +4852,8 @@ function normalizeBuildingPaymentOptions(options) {
       paymentLink: String(detailObj.paymentLink || "").trim(),
       upiId: String(detailObj.upiId || "").trim(),
       phonePeNumber: String(detailObj.phonePeNumber || "").trim(),
+      phonePeUrl: String(detailObj.phonePeUrl || "").trim(),
+      phonePeQrUrl: String(detailObj.phonePeQrUrl || "").trim(),
       bankAccountHolder: String(detailObj.bankAccountHolder || "").trim(),
       bankAccountNumber: String(detailObj.bankAccountNumber || "").trim(),
       bankIfsc: String(detailObj.bankIfsc || "").trim(),
@@ -4740,6 +4950,33 @@ function renderBuildingPaymentFields() {
         )}" />
       </label>
       <label>
+        PhonePe URL
+        <input type="url" placeholder="https://..." data-phone-pe-url="${escapeHtml(building)}" value="${escapeHtml(
+          details.phonePeUrl || ""
+        )}" />
+      </label>
+      <label>
+        PhonePe QR Code Image URL
+        <input type="url" placeholder="https://.../qr.png" data-phone-pe-qr-url="${escapeHtml(building)}" value="${escapeHtml(
+          details.phonePeQrUrl || ""
+        )}" />
+      </label>
+      <label>
+        Upload PhonePe QR (JPEG/PNG)
+        <input type="file" accept="image/jpeg,image/png" data-phone-pe-qr-file="${escapeHtml(building)}" />
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" data-clear-phone-pe-qr="${escapeHtml(building)}" />
+        Remove existing QR
+      </label>
+      ${
+        details.phonePeQrUrl
+          ? `<div class="settings-qr-preview-wrap"><span>Current QR Preview</span><img class="settings-qr-preview" src="${escapeHtml(
+              details.phonePeQrUrl
+            )}" alt="${escapeHtml(building)} QR preview" loading="lazy" /></div>`
+          : ""
+      }
+      <label>
         Bank Account Holder
         <input type="text" placeholder="Account holder name" data-bank-holder="${escapeHtml(building)}" value="${escapeHtml(
           details.bankAccountHolder || ""
@@ -4804,7 +5041,7 @@ function getBuildingLandlordsFromSettings() {
   return normalizeBuildingLandlords(existing);
 }
 
-function getBuildingPaymentOptionsFromSettings() {
+async function getBuildingPaymentOptionsFromSettings() {
   const existing = { ...(state.notifyConfig.buildingPaymentOptions || {}) };
   if (!buildingPaymentFieldsEl) return normalizeBuildingPaymentOptions(existing);
 
@@ -4821,13 +5058,60 @@ function getBuildingPaymentOptionsFromSettings() {
   setField("input[data-payment-link]", "paymentLink");
   setField("input[data-upi-id]", "upiId");
   setField("input[data-phone-pe-number]", "phonePeNumber");
+  setField("input[data-phone-pe-url]", "phonePeUrl");
+  setField("input[data-phone-pe-qr-url]", "phonePeQrUrl");
   setField("input[data-bank-holder]", "bankHolder");
   setField("input[data-bank-account-number]", "bankAccountNumber");
   setField("input[data-bank-ifsc]", "bankIfsc");
   setField("input[data-bank-name]", "bankName");
   setField("textarea[data-payment-notes]", "paymentNotes");
 
+  buildingPaymentFieldsEl.querySelectorAll("input[data-clear-phone-pe-qr]").forEach((input) => {
+    const building = normalizeUnitText(input.dataset.clearPhonePeQr || "");
+    if (!building || !input.checked) return;
+    if (!existing[building]) existing[building] = {};
+    existing[building].phonePeQrUrl = "";
+  });
+
+  const qrUploads = Array.from(buildingPaymentFieldsEl.querySelectorAll("input[data-phone-pe-qr-file]")).map(
+    async (input) => {
+      const building = normalizeUnitText(input.dataset.phonePeQrFile || "");
+      if (!building) return;
+      const file = input.files?.[0] || null;
+      if (!file) return;
+      if (!existing[building]) existing[building] = {};
+      existing[building].phonePeQrUrl = await readImageFileAsDataUrl(file);
+    }
+  );
+  await Promise.all(qrUploads);
+
   return normalizeBuildingPaymentOptions(existing);
+}
+
+function readImageFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve("");
+      return;
+    }
+    const safeType = String(file.type || "").toLowerCase();
+    if (!safeType.includes("jpeg") && !safeType.includes("jpg") && !safeType.includes("png")) {
+      reject(new Error("Only JPEG/PNG images are supported for QR upload."));
+      return;
+    }
+    if (file.size > 400 * 1024) {
+      reject(new Error("QR image is too large. Please upload image under 400 KB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      if (!result) reject(new Error("Unable to read selected QR image."));
+      else resolve(result);
+    };
+    reader.onerror = () => reject(new Error("Unable to read selected QR image."));
+    reader.readAsDataURL(file);
+  });
 }
 
 function keyToPaymentFieldName(key) {
