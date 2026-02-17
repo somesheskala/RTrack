@@ -25,6 +25,7 @@ Important:
 ### Step 1: Create project
 1. Go to https://supabase.com
 2. Create/select project.
+3. somesh.eskala@gmail.com/Mysupabase@143
 
 ### Step 2: Create table and policies
 1. Open Supabase `SQL Editor`.
@@ -68,6 +69,7 @@ Without storage bucket, tenant PDF/document upload will fail.
 ### Step 1: Create EmailJS account
 1. Go to https://www.emailjs.com
 2. Create account/login.
+3. somesh.eskala@gmail.com/Myemailjs@143
 
 ### Step 2: Add email service
 1. Create a mail service connection (Gmail/Outlook/etc).
@@ -102,7 +104,8 @@ Click `Save Email Lists`.
 ---
 
 ## 4. Netlify Deployment
-
+1. https://app.netlify.com/teams/somesh-eskala/projects
+2. somesh.eskala@gmail.com/Mynetlify@143
 ## Option A: Deploy from GitHub (recommended)
 1. Push code to GitHub repo (for example `somesheskala/RTrack`).
 2. In Netlify: `Add new site -> Import an existing project`.
